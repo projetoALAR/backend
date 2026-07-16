@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import { Controller, Post, Body, Get, Delete, Param } from '@nestjs/common';
 import { ClientesService } from './clientes.service';
 import { Prisma as PrismaTypes } from '@prisma/client';
 
@@ -18,4 +18,9 @@ export class ClientesController {
   async listarTodos() {
     return this.clientesService.listarTodos();
   }
+
+  @Delete(':id')
+  async remover(@Param('id') id: string) {
+    return this.clientesService.remover(id);
+  }  
 }

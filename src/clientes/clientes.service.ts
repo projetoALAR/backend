@@ -16,4 +16,10 @@ export class ClientesService {
   async listarTodos() {
     return this.prisma.cliente.findMany();
   }
+
+  async remover(id: string) {
+  return this.prisma.cliente.delete({
+    where: { id },
+  });
+}
 }
