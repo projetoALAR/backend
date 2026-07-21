@@ -1,0 +1,15 @@
+---
+description: prisma migration conventions
+globs:
+  - "prisma/**/*.prisma"
+  - "prisma/migrations/**/*.sql"
+  - "prisma.config.ts"
+alwaysApply: false
+---
+
+# Prisma migration conventions
+
+- Keep `prisma/schema.prisma` aligned with `prisma/migrations/*/migration.sql`.
+- Update `prisma.config.ts` when `DIRECT_URL` changes.
+- Re-run `npx prisma generate` after schema edits.
+- Prefer additive migrations that match existing table names and relations.

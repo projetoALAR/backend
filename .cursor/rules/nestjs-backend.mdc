@@ -1,0 +1,14 @@
+---
+description: nestjs prisma backend conventions
+globs:
+  - "src/**/*.ts"
+alwaysApply: false
+---
+
+# NestJS backend conventions
+
+- Keep controllers thin in `src/*/*.controller.ts`.
+- Put Prisma access in `src/*/*.service.ts` via `src/prisma.service.ts`.
+- Reuse `Prisma` types from `@prisma/client` for `@Body()` payloads.
+- Preserve module wiring in `src/*/*.module.ts`.
+- Keep `pt-BR` identifiers and comments consistent with existing files.

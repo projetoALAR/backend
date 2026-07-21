@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "hooks": {
+    "postToolUse": [
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe"
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe --failure"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe --failure"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe --failure"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe --failure"
+      }
+    ],
+    "userPromptSubmit": [
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe --prompt"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe --prompt"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe --prompt"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn observe --prompt"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn finalize --auto"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn finalize --auto"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn finalize --auto"
+      },
+      {
+        "command": "C:\\Users\\mdmkr\\AppData\\Roaming\\npm\\caliber.cmd learn finalize --auto"
+      }
+    ]
+  }
+}

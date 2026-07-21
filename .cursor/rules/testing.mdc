@@ -1,0 +1,14 @@
+---
+description: jest and supertest patterns
+globs:
+  - "src/**/*.spec.ts"
+  - "test/**/*.ts"
+alwaysApply: false
+---
+
+# Testing patterns
+
+- Mirror the source file name in `*.spec.ts`.
+- Use `Test.createTestingModule()` for unit tests in `src/`.
+- Use `supertest` only in `test/*e2e-spec.ts`.
+- Keep assertions focused on exported behavior, not internals.

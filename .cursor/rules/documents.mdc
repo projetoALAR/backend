@@ -1,0 +1,13 @@
+---
+description: document upload conventions
+globs:
+  - "src/documentos/**/*.ts"
+alwaysApply: false
+---
+
+# Document upload conventions
+
+- Keep `FileInterceptor('arquivo')` in `src/documentos/documentos.controller.ts`.
+- Enforce the `5 * 1024 * 1024` limit in `src/documentos/documentos.module.ts`.
+- Pass `Express.Multer.File` into `src/documentos/documentos.service.ts`.
+- Persist document metadata with the related `processoId`.
