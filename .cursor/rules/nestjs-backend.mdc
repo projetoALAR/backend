@@ -12,3 +12,4 @@ alwaysApply: false
 - Reuse `Prisma` types from `@prisma/client` for `@Body()` payloads.
 - Preserve module wiring in `src/*/*.module.ts`.
 - Keep `pt-BR` identifiers and comments consistent with existing files.
+- Keep `chat`, `equipe`, and `preferencias` module wiring aligned with `src/app.module.ts`.

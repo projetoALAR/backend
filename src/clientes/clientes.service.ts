@@ -14,12 +14,24 @@ export class ClientesService {
   }
 
   async listarTodos() {
-    return this.prisma.cliente.findMany();
+    return this.prisma.cliente.findMany({
+      include: {
+        _count: { select: { processos: true } },
+      },
+      orderBy: { criadoEm: 'desc' },
+    });
+  }
+
+  async atualizar(id: string, dados: Prisma.ClienteUpdateInput) {
+    return this.prisma.cliente.update({
+      where: { id },
+      data: dados,
+    });
   }
 
   async remover(id: string) {
-  return this.prisma.cliente.delete({
-    where: { id },
-  });
-}
+    return this.prisma.cliente.delete({
+      where: { id },
+    });
+  }
 }

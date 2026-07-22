@@ -1,8 +1,8 @@
 # AGENTS.md
 
 ## visão do projeto
-- backend `NestJS` em `src/` com módulos que cobrem clientes, processos, compromissos, documentos e dashboard.
-- `Prisma` em `prisma/schema.prisma`, `prisma/migrations/*/migration.sql`, `src/prisma.service.ts` e `prisma.config.ts`; as migrações incluem `prisma/migrations/20260617011115_init_clientes/`, `prisma/migrations/20260715165434_add_tabela_processos/`, `prisma/migrations/20260716143223_add_tabela_compromissos/` e `prisma/migrations/20260716152330_add_tabela_documentos/`.
+- backend `NestJS` em `src/` com módulos que cobrem clientes, processos, compromissos, documentos, dashboard, chat, equipe e preferencias.
+- `Prisma` em `prisma/schema.prisma`, `prisma/migrations/*/migration.sql`, `src/prisma.service.ts` e `prisma.config.ts`; as migrações incluem `prisma/migrations/20260617011115_init_clientes/`, `prisma/migrations/20260715165434_add_tabela_processos/`, `prisma/migrations/20260716143223_add_tabela_compromissos/`, `prisma/migrations/20260716152330_add_tabela_documentos/` e `prisma/migrations/20260722011119_sync_processo_equipe_chat_preferencias/`.
 - testes com `Jest` em `src/**/*.spec.ts` e `test/app.e2e-spec.ts`.
 - `src/dashboard/` concentra a camada de painel e agregação de dados do sistema.
 - upload de arquivos em `src/documentos/` usa `@nestjs/platform-express`, `multer` e `@supabase/supabase-js`.
@@ -61,7 +61,7 @@ grep -q "caliber" .git/hooks/pre-commit 2>/dev/null && echo "hook-active" || ech
 - If **hook-active**: the hook handles sync automatically — just commit normally. Tell the user: "Caliber will sync your agent configs automatically via the pre-commit hook."
 - If **no-hook**: run Caliber manually before committing:
   1. Tell the user: "Caliber: Syncing agent configs with your latest changes..."
-  2. Run: `caliber refresh && git add CLAUDE.md .claude/ .cursor/ .cursorrules .github/copilot-instructions.md .github/instructions/ AGENTS.md CALIBER_LEARNINGS.md .agents/ .opencode/ 2>/dev/null`
+  2. Run: `caliber refresh && git add CALIBER_LEARNINGS.md .cursor/ .cursorrules AGENTS.md .agents/ 2>/dev/null`
   3. After it completes, briefly tell the user what Caliber updated. Then proceed with the commit.
 
 **Valid `caliber refresh` options:** `--quiet` (suppress output) and `--dry-run` (preview without writing). Do not pass any other flags — options like `--auto-approve`, `--debug`, or `--force` do not exist and will cause errors.

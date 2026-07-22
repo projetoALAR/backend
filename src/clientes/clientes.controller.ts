@@ -1,26 +1,31 @@
-import { Controller, Post, Body, Get, Delete, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Put, Delete, Param } from '@nestjs/common';
 import { ClientesService } from './clientes.service';
 import { Prisma as PrismaTypes } from '@prisma/client';
 
 @Controller('clientes')
 export class ClientesController {
-// Injeção de Dependência: Conectando o Garçom à Cozinha
   constructor(private readonly clientesService: ClientesService) {}
 
-// Rota para RECEBER os dados do Front-end e CADASTRAR
   @Post()
   async criar(@Body() dados: PrismaTypes.ClienteCreateInput) {
     return this.clientesService.criar(dados);
   }
 
-// Rota para DEVOLVER a lista de clientes para o Front-end
   @Get()
   async listarTodos() {
     return this.clientesService.listarTodos();
   }
 
+  @Put(':id')
+  async atualizar(
+    @Param('id') id: string,
+    @Body() dados: PrismaTypes.ClienteUpdateInput,
+  ) {
+    return this.clientesService.atualizar(id, dados);
+  }
+
   @Delete(':id')
   async remover(@Param('id') id: string) {
     return this.clientesService.remover(id);
-  }  
+  }
 }
