@@ -69,13 +69,24 @@ model MembroEquipe {
   criadoEm DateTime @default(now())
 }
 
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senhaHash String
+  fotoUrl   String?
+  criadoEm  DateTime @default(now())
+}
+
 model Preferencia {
-  id            String   @id @default("default")
-  nome          String   @default("")
-  email         String   @default("")
-  notificacoes  Json     @default("{\"email\":true,\"push\":true,\"reminders\":true,\"teamUpdates\":true}")
-  tema          String   @default("light")
-  atualizadoEm  DateTime @updatedAt
+  id                 String   @id @default("default")
+  nome               String   @default("")
+  email              String   @default("")
+  fotoUrl            String?
+  notificacoes       Json     @default("{\"email\":true,\"push\":true,\"reminders\":true,\"teamUpdates\":true}")
+  notificacoesLidas  Json     @default("[]")
+  tema               String   @default("light")
+  atualizadoEm       DateTime @updatedAt
 }
 
 model Conversacao {

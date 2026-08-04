@@ -1,4 +1,4 @@
-#!/bin/sh
+pode #!/bin/sh
 # Don't block headless claude sessions spawned by caliber itself (e.g. during caliber refresh)
 if [ "$CALIBER_SUBPROCESS" = "1" ] || [ -n "$CALIBER_SPAWNED" ]; then
   exit 0

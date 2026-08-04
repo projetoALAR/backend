@@ -25,6 +25,20 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Autenticação (JWT)
+
+Variáveis de ambiente do backend:
+
+- `JWT_SECRET` — segredo para assinar tokens (obrigatório em produção)
+- `JWT_EXPIRES_IN` — validade do token (padrão: `7d`)
+- `AUTH_ADMIN_EMAIL` — e-mail do admin criado no primeiro boot (padrão: `admin@alar.com.br`)
+- `AUTH_ADMIN_PASSWORD` — senha do admin (padrão: `admin123`)
+- `AUTH_ADMIN_NOME` — nome do admin (padrão: `Administrador`)
+
+No primeiro start, se a tabela `Usuario` estiver vazia, o admin é criado automaticamente.
+
+Endpoints públicos: `POST /auth/login`, `POST /auth/register`, `GET /`. Demais rotas exigem `Authorization: Bearer <token>`.
+
 ## Project setup
 
 ```bash
