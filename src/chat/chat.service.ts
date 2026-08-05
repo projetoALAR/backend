@@ -1,16 +1,24 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { LlmService } from './llm.service';
+import { ChatContextService } from './chat-context.service';
 
 @Injectable()
 export class ChatService {
   constructor(
     private prisma: PrismaService,
     private llm: LlmService,
+    private chatContext: ChatContextService,
   ) {}
 
+  /** Apenas conversas do chat geral (sem vínculo com processo). */
   async listarConversas() {
     return this.prisma.conversacao.findMany({
+      where: { processoId: null },
       orderBy: { atualizadoEm: 'desc' },
       include: {
         mensagens: {
@@ -22,6 +30,10 @@ export class ChatService {
     });
   }
 
+  /**
+   * Abre conversa do chat geral.
+   * Conversas de caso (processoId preenchido) são bloqueadas aqui.
+   */
   async obterConversa(id: string) {
     const conversa = await this.prisma.conversacao.findUnique({
       where: { id },
@@ -32,21 +44,36 @@ export class ChatService {
     if (!conversa) {
       throw new NotFoundException('Conversa não encontrada.');
     }
+    if (conversa.processoId) {
+      throw new ForbiddenException(
+        'Esta conversa pertence a um caso e só pode ser acessada pelo chat do painel do processo.',
+      );
+    }
     return conversa;
   }
 
   async criarConversa(dados: { titulo?: string; processoId?: string }) {
+    // Chat geral nunca aceita processoId por esta rota pública de criação “livre”
     const titulo = dados.titulo?.trim() || 'Nova conversa';
     return this.prisma.conversacao.create({
       data: {
         titulo,
-        processoId: dados.processoId,
+        processoId: null,
       },
       include: { mensagens: true },
     });
   }
 
+  /** Chat exclusivo do caso — isolado do chat geral. */
   async obterOuCriarPorProcesso(processoId: string) {
+    const processo = await this.prisma.processo.findUnique({
+      where: { id: processoId },
+      select: { id: true, titulo: true, numero: true },
+    });
+    if (!processo) {
+      throw new NotFoundException('Processo não encontrado.');
+    }
+
     const existente = await this.prisma.conversacao.findFirst({
       where: { processoId },
       include: { mensagens: { orderBy: { criadoEm: 'asc' } } },
@@ -56,7 +83,7 @@ export class ChatService {
 
     return this.prisma.conversacao.create({
       data: {
-        titulo: 'Assistente do processo',
+        titulo: `Caso: ${processo.titulo || processo.numero}`,
         processoId,
       },
       include: { mensagens: true },
@@ -90,7 +117,28 @@ export class ChatService {
       content: m.conteudo,
     }));
 
-    const resposta = await this.llm.gerarRespostaJuridica(conteudo, historico);
+    let resposta: string;
+    if (conversa.processoId) {
+      const caso = await this.chatContext.montarContextoCaso(
+        conversa.processoId,
+        conteudo,
+      );
+      const pedeArquivos = this.chatContext.perguntaPedeArquivos(conteudo);
+      resposta = await this.llm.gerarRespostaJuridica(conteudo, historico, {
+        modo: 'caso',
+        contextoTexto: caso.textoContexto,
+        imagensUrls: caso.imagensUrls,
+        detalheImagem: pedeArquivos ? 'high' : 'auto',
+      });
+    } else {
+      const contextoProjeto = await this.chatContext.montarContexto({
+        pergunta: conteudo,
+      });
+      resposta = await this.llm.gerarRespostaJuridica(conteudo, historico, {
+        modo: 'workspace',
+        contextoTexto: contextoProjeto,
+      });
+    }
 
     const mensagemIa = await this.prisma.mensagem.create({
       data: {
@@ -100,13 +148,17 @@ export class ChatService {
       },
     });
 
+    const tituloPadrao =
+      conversa.titulo === 'Nova conversa' ||
+      conversa.titulo.startsWith('Caso:') ||
+      conversa.titulo === 'Assistente do processo';
+
     await this.prisma.conversacao.update({
       where: { id: conversacaoId },
       data: {
         atualizadoEm: new Date(),
         titulo:
-          conversa.titulo === 'Nova conversa' ||
-          conversa.titulo === 'Assistente do processo'
+          !conversa.processoId && tituloPadrao
             ? conteudo.slice(0, 60)
             : conversa.titulo,
       },
@@ -116,6 +168,17 @@ export class ChatService {
   }
 
   async removerConversa(id: string) {
+    const conversa = await this.prisma.conversacao.findUnique({
+      where: { id },
+    });
+    if (!conversa) {
+      throw new NotFoundException('Conversa não encontrada.');
+    }
+    if (conversa.processoId) {
+      throw new ForbiddenException(
+        'Conversas de caso não podem ser removidas pelo chat geral.',
+      );
+    }
     return this.prisma.conversacao.delete({ where: { id } });
   }
 }

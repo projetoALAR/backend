@@ -9,6 +9,25 @@ const RESPOSTAS_MOCK = [
   'Entendi. Vamos priorizar os prazos mais próximos e alinhar as tarefas da equipe.',
 ];
 
+type ChatTextPart = { type: 'text'; text: string };
+type ChatImagePart = {
+  type: 'image_url';
+  image_url: { url: string; detail?: 'low' | 'high' | 'auto' };
+};
+type ChatContent = string | Array<ChatTextPart | ChatImagePart>;
+
+type ChatMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: ChatContent;
+};
+
+export type LlmOpcoes = {
+  contextoTexto?: string;
+  imagensUrls?: string[];
+  modo?: 'workspace' | 'caso';
+  detalheImagem?: 'low' | 'high' | 'auto';
+};
+
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
@@ -18,7 +37,11 @@ export class LlmService {
   async gerarRespostaJuridica(
     mensagemUsuario: string,
     historico: { role: 'user' | 'assistant'; content: string }[] = [],
+    opcoes: LlmOpcoes | string = {},
   ): Promise<string> {
+    const opts: LlmOpcoes =
+      typeof opcoes === 'string' ? { contextoTexto: opcoes } : opcoes;
+
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
       this.logger.warn('OPENAI_API_KEY ausente — usando resposta mock');
@@ -28,30 +51,76 @@ export class LlmService {
     const baseUrl =
       this.config.get<string>('OPENAI_BASE_URL') ||
       'https://api.openai.com/v1';
-    const model =
-      this.config.get<string>('OPENAI_MODEL') || 'gpt-4o-mini';
+    const model = this.config.get<string>('OPENAI_MODEL') || 'gpt-4o-mini';
+
+    const modoCaso = opts.modo === 'caso';
+    const systemPrompt = modoCaso
+      ? [
+          'Você é o assistente do Alar dedicado a UM caso específico (aberto no painel do processo).',
+          'Além de conhecimento geral (história, direito, etc.), você tem acesso completo a este caso: dados, cliente, prazos e TODOS os arquivos anexados (imagens, textos, PDFs listados, vídeos por metadados).',
+          'Pode resumir o caso, analisar arquivos/imagens, extrair informações dos anexos e sugerir próximos passos.',
+          'Respostas conversacionais curtas quando a pergunta for curta; análises profundas quando pedirem resumo/análise.',
+          'Não use sempre o mesmo template engessado. Varie o formato.',
+          'Não invente documentos ou fatos fora do contexto/anexos.',
+          'Responda em português do Brasil. Aviso: não substitui parecer de advogado.',
+        ].join(' ')
+      : [
+          'Você é o assistente GERAL do workspace Alar (menu Chat IA).',
+          'Pode responder perguntas gerais e usar APENAS dados agregados do escritório (quantidades, títulos e status dos casos).',
+          'PRIVACIDADE CRÍTICA: você NÃO tem acesso ao conteúdo interno dos casos (descrição, cliente, documentos, imagens, vídeos, chats do caso).',
+          'Se pedirem resumo ou detalhes de um caso específico (ex.: "resumo do caso do Matheus"), RECUSE educadamente e diga para abrir o caso no painel e usar o chat dali.',
+          'Pode dizer quantos casos ativos existem e listar títulos/números/status.',
+          'Não invente detalhes internos. Responda em português do Brasil.',
+        ].join(' ');
+
+    const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }];
+
+    if (opts.contextoTexto?.trim()) {
+      messages.push({
+        role: 'system',
+        content: modoCaso
+          ? `Contexto completo deste caso (use para responder com precisão):\n\n${opts.contextoTexto}`
+          : `Contexto operacional do workspace:\n\n${opts.contextoTexto}`,
+      });
+    }
+
+    for (const m of historico.slice(-10)) {
+      messages.push({ role: m.role, content: m.content });
+    }
+
+    const imagens = (opts.imagensUrls || []).slice(0, 8);
+    const detalhe = opts.detalheImagem || 'auto';
+    if (imagens.length > 0) {
+      const parts: Array<ChatTextPart | ChatImagePart> = [
+        { type: 'text', text: mensagemUsuario },
+        ...imagens.map(
+          (url): ChatImagePart => ({
+            type: 'image_url',
+            image_url: { url, detail: detalhe },
+          }),
+        ),
+      ];
+      messages.push({ role: 'user', content: parts });
+    } else {
+      messages.push({ role: 'user', content: mensagemUsuario });
+    }
 
     try {
-      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
+      const response = await fetch(
+        `${baseUrl.replace(/\/$/, '')}/chat/completions`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            temperature: modoCaso ? 0.4 : 0.35,
+            messages,
+          }),
         },
-        body: JSON.stringify({
-          model,
-          temperature: 0.4,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'Você é um assistente jurídico brasileiro do sistema Alar. Responda em português do Brasil, de forma objetiva e profissional. Não invente jurisprudência específica; oriente com boas práticas e próximos passos. Aviso: não substitui parecer de advogado.',
-            },
-            ...historico.slice(-10),
-            { role: 'user', content: mensagemUsuario },
-          ],
-        }),
-      });
+      );
 
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
