@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { Prisma } from '@prisma/client';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
+import { CreateProcessoDto, UpdateProcessoDto } from './processos.dto';
 
 @Injectable()
 export class ProcessosService {
@@ -10,11 +10,29 @@ export class ProcessosService {
     private notificacoes: NotificacoesService,
   ) {}
 
-  async criar(dados: Prisma.ProcessoUncheckedCreateInput) {
+  async criar(dados: CreateProcessoDto) {
     const processo = await this.prisma.processo.create({
-      data: dados,
+      data: {
+        numero: dados.numero.trim(),
+        status: dados.status,
+        clienteId: dados.clienteId,
+        titulo: dados.titulo,
+        descricao: dados.descricao ?? null,
+        prioridade: dados.prioridade,
+        prazo: dados.prazo ? new Date(dados.prazo) : null,
+        tags: dados.tags ?? undefined,
+        concluido: dados.concluido ?? false,
+      },
       include: {
-        cliente: { select: { id: true, nome: true, email: true, telefone: true, cpf: true } },
+        cliente: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+            telefone: true,
+            cpf: true,
+          },
+        },
       },
     });
 
@@ -35,7 +53,15 @@ export class ProcessosService {
     return this.prisma.processo.findMany({
       where: { clienteId },
       include: {
-        cliente: { select: { id: true, nome: true, email: true, telefone: true, cpf: true } },
+        cliente: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+            telefone: true,
+            cpf: true,
+          },
+        },
       },
       orderBy: { criadoEm: 'desc' },
     });
@@ -44,19 +70,55 @@ export class ProcessosService {
   async listarTodos() {
     return this.prisma.processo.findMany({
       include: {
-        cliente: { select: { id: true, nome: true, email: true, telefone: true, cpf: true } },
+        cliente: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+            telefone: true,
+            cpf: true,
+          },
+        },
         _count: { select: { documentos: true, compromissos: true } },
       },
       orderBy: { criadoEm: 'desc' },
     });
   }
 
-  async atualizar(id: string, dados: Prisma.ProcessoUncheckedUpdateInput) {
+  async atualizar(id: string, dados: UpdateProcessoDto) {
     return this.prisma.processo.update({
       where: { id },
-      data: dados,
+      data: {
+        ...(dados.numero !== undefined ? { numero: dados.numero.trim() } : {}),
+        ...(dados.status !== undefined ? { status: dados.status } : {}),
+        ...(dados.clienteId !== undefined
+          ? { clienteId: dados.clienteId }
+          : {}),
+        ...(dados.titulo !== undefined ? { titulo: dados.titulo } : {}),
+        ...(dados.descricao !== undefined
+          ? { descricao: dados.descricao }
+          : {}),
+        ...(dados.prioridade !== undefined
+          ? { prioridade: dados.prioridade }
+          : {}),
+        ...(dados.prazo !== undefined
+          ? { prazo: dados.prazo ? new Date(dados.prazo) : null }
+          : {}),
+        ...(dados.tags !== undefined ? { tags: dados.tags } : {}),
+        ...(dados.concluido !== undefined
+          ? { concluido: dados.concluido }
+          : {}),
+      },
       include: {
-        cliente: { select: { id: true, nome: true, email: true, telefone: true, cpf: true } },
+        cliente: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+            telefone: true,
+            cpf: true,
+          },
+        },
       },
     });
   }

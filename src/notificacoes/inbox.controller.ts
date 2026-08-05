@@ -6,10 +6,12 @@ import {
   Put,
   Post,
   Query,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { NotificacoesService } from './notificacoes.service';
+import { CreateContatoDto } from '../common/common.dto';
 
 @Controller()
 export class InboxController {
@@ -36,7 +38,7 @@ export class InboxController {
   @Put('inbox/:id/lida')
   async marcarLida(
     @CurrentUser() user: { id: string },
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.prisma.inboxItem.updateMany({
       where: { id, usuarioId: user.id },
@@ -55,15 +57,7 @@ export class InboxController {
   @Post('contatos')
   async registrarContato(
     @CurrentUser() user: { id: string },
-    @Body()
-    body: {
-      alvoTipo: string;
-      alvoId: string;
-      alvoNome: string;
-      canal: 'email' | 'telefone';
-      observacao?: string;
-      destino?: string;
-    },
+    @Body() body: CreateContatoDto,
   ) {
     const log = await this.prisma.contatoLog.create({
       data: {

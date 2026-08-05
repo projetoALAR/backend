@@ -49,19 +49,19 @@ export class LlmService {
     }
 
     const baseUrl =
-      this.config.get<string>('OPENAI_BASE_URL') ||
-      'https://api.openai.com/v1';
+      this.config.get<string>('OPENAI_BASE_URL') || 'https://api.openai.com/v1';
     const model = this.config.get<string>('OPENAI_MODEL') || 'gpt-4o-mini';
 
     const modoCaso = opts.modo === 'caso';
     const systemPrompt = modoCaso
       ? [
           'Você é o assistente do Alar dedicado a UM caso específico (aberto no painel do processo).',
-          'Além de conhecimento geral (história, direito, etc.), você tem acesso completo a este caso: dados, cliente, prazos e TODOS os arquivos anexados (imagens, textos, PDFs listados, vídeos por metadados).',
-          'Pode resumir o caso, analisar arquivos/imagens, extrair informações dos anexos e sugerir próximos passos.',
+          'Use SEMPRE o contexto do caso fornecido (dados, cliente, prazos, lista de arquivos e textos/PDFs extraídos).',
+          'Quando houver imagens anexadas na mensagem do usuário, analise o conteúdo visual e relate o que aparece de forma objetiva.',
+          'OBRIGATÓRIO: se fizer resumo do caso ou listar anexos, mencione TODOS os arquivos do inventário pelo nome — nunca omita um anexo.',
+          'Responda com base nos fatos deste caso. Não invente documentos, datas ou partes.',
+          'Se a pergunta for sobre a imagem/anexo, descreva o que vê e relacione com o caso.',
           'Respostas conversacionais curtas quando a pergunta for curta; análises profundas quando pedirem resumo/análise.',
-          'Não use sempre o mesmo template engessado. Varie o formato.',
-          'Não invente documentos ou fatos fora do contexto/anexos.',
           'Responda em português do Brasil. Aviso: não substitui parecer de advogado.',
         ].join(' ')
       : [
@@ -93,12 +93,10 @@ export class LlmService {
     if (imagens.length > 0) {
       const parts: Array<ChatTextPart | ChatImagePart> = [
         { type: 'text', text: mensagemUsuario },
-        ...imagens.map(
-          (url): ChatImagePart => ({
-            type: 'image_url',
-            image_url: { url, detail: detalhe },
-          }),
-        ),
+        ...imagens.map((url): ChatImagePart => ({
+          type: 'image_url',
+          image_url: { url, detail: detalhe },
+        })),
       ];
       messages.push({ role: 'user', content: parts });
     } else {
@@ -125,7 +123,16 @@ export class LlmService {
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         this.logger.error(`LLM HTTP ${response.status}: ${errText}`);
-        return RESPOSTAS_MOCK[Math.floor(Math.random() * RESPOSTAS_MOCK.length)];
+        if (modoCaso) {
+          return (
+            'Não consegui analisar o caso agora (falha na chamada à IA). ' +
+            'Confira se a OPENAI_API_KEY está válida e se as imagens anexadas estão acessíveis. ' +
+            'Tente de novo em instantes.'
+          );
+        }
+        return RESPOSTAS_MOCK[
+          Math.floor(Math.random() * RESPOSTAS_MOCK.length)
+        ];
       }
 
       const data = (await response.json()) as {
@@ -138,6 +145,11 @@ export class LlmService {
       );
     } catch (error) {
       this.logger.error('Falha ao chamar LLM', error as Error);
+      if (modoCaso) {
+        return (
+          'Falha ao contatar o modelo de IA. Verifique a conexão e a chave OPENAI_API_KEY, depois tente novamente.'
+        );
+      }
       return RESPOSTAS_MOCK[Math.floor(Math.random() * RESPOSTAS_MOCK.length)];
     }
   }

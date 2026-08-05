@@ -6,12 +6,12 @@ import { PrismaService } from '../prisma.service';
 
 @Module({
   imports: [
-    // Isso prepara o NestJS para processar arquivos em memória
     MulterModule.register({
-      limits: { fileSize: 5 * 1024 * 1024 }, // Limite de 5MB
+      limits: { fileSize: 5 * 1024 * 1024 },
     }),
   ],
   controllers: [DocumentosController],
   providers: [DocumentosService, PrismaService],
+  exports: [DocumentosService],
 })
 export class DocumentosModule {}

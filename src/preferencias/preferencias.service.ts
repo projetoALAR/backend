@@ -52,7 +52,8 @@ export class PreferenciasService {
     if (dados.nome !== undefined) data.nome = dados.nome;
     if (dados.email !== undefined) data.email = dados.email;
     if (dados.fotoUrl !== undefined) data.fotoUrl = dados.fotoUrl;
-    if (dados.notificacoes !== undefined) data.notificacoes = dados.notificacoes;
+    if (dados.notificacoes !== undefined)
+      data.notificacoes = dados.notificacoes;
     if (dados.notificacoesLidas !== undefined) {
       data.notificacoesLidas = dados.notificacoesLidas;
     }
@@ -102,7 +103,9 @@ export class PreferenciasService {
 
     if (uploadError) {
       console.error(uploadError);
-      throw new InternalServerErrorException('Erro ao enviar foto para a nuvem.');
+      throw new InternalServerErrorException(
+        'Erro ao enviar foto para a nuvem.',
+      );
     }
 
     const { data: publicUrlData } = this.supabase.storage

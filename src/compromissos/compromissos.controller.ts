@@ -1,13 +1,25 @@
-import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { CompromissosService } from './compromissos.service';
-import { Prisma } from '@prisma/client';
+import { CreateCompromissoDto, UpdateCompromissoDto } from './compromissos.dto';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '../auth/roles';
 
 @Controller('compromissos')
 export class CompromissosController {
   constructor(private readonly compromissosService: CompromissosService) {}
 
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Post()
-  async criar(@Body() dados: Prisma.CompromissoUncheckedCreateInput) {
+  async criar(@Body() dados: CreateCompromissoDto) {
     return this.compromissosService.criar(dados);
   }
 
@@ -16,16 +28,18 @@ export class CompromissosController {
     return this.compromissosService.listarTodos();
   }
 
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Put(':id')
   async atualizar(
-    @Param('id') id: string,
-    @Body() dados: Prisma.CompromissoUncheckedUpdateInput,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dados: UpdateCompromissoDto,
   ) {
     return this.compromissosService.atualizar(id, dados);
   }
 
+  @Roles(Role.ADMIN, Role.ADVOGADO)
   @Delete(':id')
-  async remover(@Param('id') id: string) {
+  async remover(@Param('id', ParseUUIDPipe) id: string) {
     return this.compromissosService.remover(id);
   }
 }

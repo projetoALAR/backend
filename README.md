@@ -23,17 +23,37 @@
 
 ## Description
 
+**Alar API** — backend NestJS do workspace jurídico (Prisma, JWT, RBAC, Supabase Storage).
+
+Setup completo na raiz do projeto: `../README.md`. Use `.env.example` como base.
+
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
-## Autenticação (JWT)
+## Autenticação (JWT) e papéis (RBAC)
 
-Variáveis de ambiente do backend:
+Variáveis de ambiente do backend (veja também `.env.example`):
 
 - `JWT_SECRET` — segredo para assinar tokens (obrigatório em produção)
 - `JWT_EXPIRES_IN` — validade do token (padrão: `7d`)
+- `CORS_ORIGINS` — origens do frontend separadas por vírgula (ex.: `http://localhost:3000`)
 - `AUTH_ADMIN_EMAIL` — e-mail do admin criado no primeiro boot (padrão: `admin@alar.com.br`)
-- `AUTH_ADMIN_PASSWORD` — senha do admin (padrão: `admin123`)
+- `AUTH_ADMIN_PASSWORD` — senha do admin (**mínimo 8 caracteres**; sem ela o admin não é criado)
 - `AUTH_ADMIN_NOME` — nome do admin (padrão: `Administrador`)
+- `AUTH_ALLOW_PUBLIC_REGISTER` — `true` libera `POST /auth/register` (padrão: `false`)
+
+### Papéis
+
+| Papel | Permissões |
+|-------|------------|
+| `ADMIN` | Acesso total, gestão de equipe e criação de usuários (`POST /auth/usuarios`) |
+| `ADVOGADO` | CRUD de clientes/processos/documentos; leitura de equipe |
+| `ASSISTENTE` | Leitura geral; upload de documentos e compromissos; sem exclusão crítica |
+
+No primeiro start, se a tabela `Usuario` estiver vazia **e** `AUTH_ADMIN_PASSWORD` estiver definida, o admin é criado com papel `ADMIN`.
+
+Endpoints públicos: `POST /auth/login`, `POST /auth/register` (se liberado), `GET /`. Demais rotas exigem `Authorization: Bearer <token>`.
+
+Rate limit: login (10/min) e register (5/min). Helmet e CORS configuráveis estão ativos.
 
 ### Chat IA (OpenAI-compatible)
 
@@ -47,10 +67,6 @@ Variáveis de ambiente do backend:
 - `SMTP_SECURE=true` para TLS implícito
 
 Sem SMTP, avisos ainda vão para a caixa de mensagens (`/inbox` / página Mensagens).
-
-No primeiro start, se a tabela `Usuario` estiver vazia, o admin é criado automaticamente.
-
-Endpoints públicos: `POST /auth/login`, `POST /auth/register`, `GET /`. Demais rotas exigem `Authorization: Bearer <token>`.
 
 ## Project setup
 

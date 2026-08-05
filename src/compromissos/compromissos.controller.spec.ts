@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CompromissosController } from './compromissos.controller';
+import { CompromissosService } from './compromissos.service';
 
 describe('CompromissosController', () => {
   let controller: CompromissosController;
@@ -7,6 +8,17 @@ describe('CompromissosController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CompromissosController],
+      providers: [
+        {
+          provide: CompromissosService,
+          useValue: {
+            criar: jest.fn(),
+            listarTodos: jest.fn(),
+            atualizar: jest.fn(),
+            remover: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     controller = module.get<CompromissosController>(CompromissosController);

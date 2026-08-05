@@ -1,15 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { Prisma } from '@prisma/client';
+import { CreateClienteDto, UpdateClienteDto } from './clientes.dto';
 
 @Injectable()
 export class ClientesService {
   constructor(private prisma: PrismaService) {}
 
-  async criar(dados: Prisma.ClienteCreateInput) {
-    // Verifique se o nome aqui está exatamente igual ao seu schema.prisma
-    return this.prisma.cliente.create({ 
-      data: dados,
+  async criar(dados: CreateClienteDto) {
+    return this.prisma.cliente.create({
+      data: {
+        nome: dados.nome.trim(),
+        cpf: dados.cpf.trim(),
+        email: dados.email?.trim() || null,
+        telefone: dados.telefone?.trim() || null,
+      },
     });
   }
 
@@ -22,10 +26,19 @@ export class ClientesService {
     });
   }
 
-  async atualizar(id: string, dados: Prisma.ClienteUpdateInput) {
+  async atualizar(id: string, dados: UpdateClienteDto) {
     return this.prisma.cliente.update({
       where: { id },
-      data: dados,
+      data: {
+        ...(dados.nome !== undefined ? { nome: dados.nome.trim() } : {}),
+        ...(dados.cpf !== undefined ? { cpf: dados.cpf.trim() } : {}),
+        ...(dados.email !== undefined
+          ? { email: dados.email?.trim() || null }
+          : {}),
+        ...(dados.telefone !== undefined
+          ? { telefone: dados.telefone?.trim() || null }
+          : {}),
+      },
     });
   }
 

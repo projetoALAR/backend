@@ -10,15 +10,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PreferenciasService } from './preferencias.service';
 import { CurrentUser } from '../auth/current-user.decorator';
-
-type PreferenciaUpdateBody = {
-  nome?: string;
-  email?: string;
-  fotoUrl?: string | null;
-  notificacoes?: Record<string, boolean>;
-  notificacoesLidas?: string[];
-  tema?: string;
-};
+import { UpdatePreferenciasDto } from '../common/common.dto';
 
 @Controller('preferencias')
 export class PreferenciasController {
@@ -31,7 +23,7 @@ export class PreferenciasController {
 
   @Put()
   async atualizar(
-    @Body() dados: PreferenciaUpdateBody,
+    @Body() dados: UpdatePreferenciasDto,
     @CurrentUser() user: { id: string },
   ) {
     return this.preferenciasService.atualizar(dados, user.id);

@@ -1,32 +1,59 @@
-// Importa utilitários do NestJS para criação de módulos de teste
 import { Test, TestingModule } from '@nestjs/testing';
-// Importa o controller principal da aplicação a ser testado
+import { ServiceUnavailableException } from '@nestjs/common';
 import { AppController } from './app.controller';
-// Importa o serviço principal da aplicação utilizado pelo controller
 import { AppService } from './app.service';
+import { PrismaService } from './prisma.service';
 
-// Bloco principal de testes do AppController
 describe('AppController', () => {
-  // Variável que armazena a instância do controller para uso nos testes
   let appController: AppController;
 
-  // Executado antes de cada teste: cria e configura o módulo de teste
   beforeEach(async () => {
-    // Cria um módulo de teste registrando o controller e o serviço necessários
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService],
+      providers: [
+        AppService,
+        {
+          provide: PrismaService,
+          useValue: {
+            $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+          },
+        },
+      ],
     }).compile();
 
-    // Obtém a instância do AppController a partir do módulo compilado
     appController = app.get<AppController>(AppController);
   });
 
-  // Bloco de testes para a rota raiz do control
   describe('root', () => {
-    // Verifica se o método getHello() retorna a string esperada 'Hello World!'
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return API info', () => {
+      expect(appController.getHello()).toEqual(
+        expect.objectContaining({ name: 'Alar API' }),
+      );
+    });
+  });
+
+  describe('health', () => {
+    it('should report ok when database is up', async () => {
+      await expect(appController.health()).resolves.toEqual(
+        expect.objectContaining({ status: 'ok', database: 'up' }),
+      );
+    });
+
+    it('should throw 503 when database is down', async () => {
+      const prisma = {
+        $queryRaw: jest.fn().mockRejectedValue(new Error('down')),
+      };
+      const module: TestingModule = await Test.createTestingModule({
+        controllers: [AppController],
+        providers: [
+          AppService,
+          { provide: PrismaService, useValue: prisma },
+        ],
+      }).compile();
+      const ctrl = module.get<AppController>(AppController);
+      await expect(ctrl.health()).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
     });
   });
 });

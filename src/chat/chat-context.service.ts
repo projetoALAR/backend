@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { DocumentosService } from '../documentos/documentos.service';
 
 export type CasoLlmAnexo = {
   textoContexto: string;
@@ -27,34 +28,32 @@ const TEXT_EXT = new Set([
   'log',
   'rtf',
 ]);
-const VIDEO_EXT = new Set([
-  'mp4',
-  'mov',
-  'avi',
-  'mkv',
-  'webm',
-  'm4v',
-  'wmv',
-]);
+const VIDEO_EXT = new Set(['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'wmv']);
 const MAX_IMAGES = 8;
 const MAX_TEXT_CHARS_PER_FILE = 12_000;
 const MAX_TEXT_FILES = 10;
+const MAX_PDF_FILES = 5;
+const MAX_PDF_CHARS_PER_FILE = 15_000;
 
 @Injectable()
 export class ChatContextService {
   private readonly logger = new Logger(ChatContextService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly documentos: DocumentosService,
+  ) {}
 
   /**
    * Snapshot AGREGADO do workspace para o chat geral (/chat).
    * Privacidade: NÃO inclui descrição, cliente, documentos nem conteúdo dos casos.
    * Pode expor apenas totais + título/status dos processos.
    */
-  async montarContexto(_opcoes?: {
+  async montarContexto(opcoes?: {
     processoId?: string | null;
     pergunta?: string;
   }): Promise<string> {
+    void opcoes;
     const agora = new Date();
 
     const [
@@ -186,6 +185,7 @@ export class ChatContextService {
     processoId: string,
     pergunta = '',
   ): Promise<CasoLlmAnexo> {
+    void pergunta;
     const processo = await this.prisma.processo.findUnique({
       where: { id: processoId },
       include: {
@@ -197,7 +197,9 @@ export class ChatContextService {
     });
 
     if (!processo) {
-      throw new NotFoundException('Processo não encontrado para o chat do caso.');
+      throw new NotFoundException(
+        'Processo não encontrado para o chat do caso.',
+      );
     }
 
     const linhas: string[] = [
@@ -240,6 +242,7 @@ export class ChatContextService {
     const imagensUrls: string[] = [];
     const textosExtraidos: string[] = [];
     let textFilesUsed = 0;
+    let pdfFilesUsed = 0;
 
     if (processo.documentos.length === 0) {
       linhas.push('- Nenhum arquivo anexado ainda.');
@@ -248,16 +251,18 @@ export class ChatContextService {
         const ext = this.extensao(doc.nome);
         const tipo = this.classificarArquivo(ext);
         const tamanho = doc.tamanho != null ? `${doc.tamanho} bytes` : '?';
+        const signedUrl = await this.documentos.resolveSignedUrl(doc.urlArquivo);
+
         linhas.push(
-          `- [${tipo}] ${doc.nome} | ${tamanho} | enviado: ${doc.criadoEm.toISOString().slice(0, 10)} | url: ${doc.urlArquivo}`,
+          `- [${tipo}] ${doc.nome} | ${tamanho} | enviado: ${doc.criadoEm.toISOString().slice(0, 10)} | acesso: ${signedUrl ? 'URL assinada temporária' : 'falhou'}`,
         );
 
-        if (tipo === 'imagem' && imagensUrls.length < MAX_IMAGES) {
-          imagensUrls.push(doc.urlArquivo);
+        if (tipo === 'imagem' && signedUrl && imagensUrls.length < MAX_IMAGES) {
+          imagensUrls.push(signedUrl);
         }
 
-        if (tipo === 'texto' && textFilesUsed < MAX_TEXT_FILES) {
-          const texto = await this.baixarTexto(doc.urlArquivo, doc.nome);
+        if (tipo === 'texto' && signedUrl && textFilesUsed < MAX_TEXT_FILES) {
+          const texto = await this.baixarTexto(signedUrl, doc.nome);
           if (texto) {
             textFilesUsed += 1;
             textosExtraidos.push(
@@ -265,8 +270,34 @@ export class ChatContextService {
             );
           }
         }
+
+        if (tipo === 'pdf' && signedUrl && pdfFilesUsed < MAX_PDF_FILES) {
+          const textoPdf = await this.baixarPdfTexto(signedUrl, doc.nome);
+          if (textoPdf) {
+            pdfFilesUsed += 1;
+            textosExtraidos.push(
+              `### Conteúdo extraído do PDF "${doc.nome}"\n${textoPdf}`,
+            );
+          } else {
+            linhas.push(
+              `  → PDF "${doc.nome}" listado, mas não foi possível extrair texto (pode ser imagem/escaneado).`,
+            );
+          }
+        }
       }
     }
+
+    // Inventário obrigatório para o modelo não "esquecer" anexos
+    linhas.push(
+      '',
+      '## INVENTÁRIO OBRIGATÓRIO DE ANEXOS',
+      `- Total de arquivos: ${processo.documentos.length}`,
+      ...processo.documentos.map(
+        (d, i) =>
+          `${i + 1}. ${d.nome} (${this.classificarArquivo(this.extensao(d.nome))})`,
+      ),
+      '- Em QUALQUER resumo do caso, liste TODOS esses arquivos pelo nome. Não omita nenhum.',
+    );
 
     if (textosExtraidos.length > 0) {
       linhas.push('', '## Conteúdo extraído de arquivos de texto');
@@ -287,7 +318,7 @@ export class ChatContextService {
     if (videos.length > 0) {
       linhas.push('', '## Vídeos');
       for (const v of videos) {
-        linhas.push(`- ${v.nome} | ${v.urlArquivo}`);
+        linhas.push(`- ${v.nome} (vídeo anexado — metadados apenas)`);
       }
       linhas.push(
         '- Vídeos: use metadados/nome; peça frame ou descrição se precisar do conteúdo visual.',
@@ -331,10 +362,7 @@ export class ChatContextService {
     return 'outro';
   }
 
-  private async baixarTexto(
-    url: string,
-    nome: string,
-  ): Promise<string | null> {
+  private async baixarTexto(url: string, nome: string): Promise<string | null> {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
       if (!res.ok) {
@@ -348,6 +376,41 @@ export class ChatContextService {
       return `${trimmed.slice(0, MAX_TEXT_CHARS_PER_FILE)}\n\n[... truncado ...]`;
     } catch (error) {
       this.logger.warn(`Erro ao ler arquivo texto ${nome}`, error as Error);
+      return null;
+    }
+  }
+
+  private async baixarPdfTexto(
+    url: string,
+    nome: string,
+  ): Promise<string | null> {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) {
+        this.logger.warn(`Falha ao baixar PDF ${nome}: HTTP ${res.status}`);
+        return null;
+      }
+      const buffer = Buffer.from(await res.arrayBuffer());
+      // pdf-parse v2+: classe PDFParse (não mais função default)
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { PDFParse } = require('pdf-parse') as {
+        PDFParse: new (opts: { data: Buffer }) => {
+          getText: () => Promise<{ text?: string }>;
+          destroy: () => Promise<void>;
+        };
+      };
+      const parser = new PDFParse({ data: buffer });
+      try {
+        const parsed = await parser.getText();
+        const trimmed = (parsed.text || '').replace(/\0/g, '').trim();
+        if (!trimmed) return null;
+        if (trimmed.length <= MAX_PDF_CHARS_PER_FILE) return trimmed;
+        return `${trimmed.slice(0, MAX_PDF_CHARS_PER_FILE)}\n\n[... PDF truncado ...]`;
+      } finally {
+        await parser.destroy().catch(() => undefined);
+      }
+    } catch (error) {
+      this.logger.warn(`Erro ao extrair PDF ${nome}`, error as Error);
       return null;
     }
   }

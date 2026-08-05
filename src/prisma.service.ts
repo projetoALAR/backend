@@ -9,7 +9,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   constructor() {
     // 1. Criamos a conexão nativa com o PostgreSQL usando sua URL do .env
     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-    
+
     // 2. Passamos essa conexão para o adaptador do Prisma
     const adapter = new PrismaPg(pool);
 

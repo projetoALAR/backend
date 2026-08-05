@@ -30,7 +30,9 @@ export class NotificacoesService {
         auth: { user, pass },
       });
     } else {
-      this.logger.warn('SMTP não configurado — e-mails serão apenas registrados no inbox');
+      this.logger.warn(
+        'SMTP não configurado — e-mails serão apenas registrados no inbox',
+      );
     }
   }
 
@@ -59,11 +61,7 @@ export class NotificacoesService {
     });
   }
 
-  async enviarEmailSeAtivo(
-    usuarioId: string,
-    assunto: string,
-    texto: string,
-  ) {
+  async enviarEmailSeAtivo(usuarioId: string, assunto: string, texto: string) {
     const prefs = await this.prefsDoUsuario(usuarioId);
     if (prefs.email === false) {
       return { skipped: true };
@@ -98,8 +96,15 @@ export class NotificacoesService {
     }
   }
 
-  async notificarTodosUsuarios(assunto: string, texto: string, link?: string, flag: keyof NotificacoesPrefs = 'reminders') {
-    const usuarios = await this.prisma.usuario.findMany({ select: { id: true } });
+  async notificarTodosUsuarios(
+    assunto: string,
+    texto: string,
+    link?: string,
+    flag: keyof NotificacoesPrefs = 'reminders',
+  ) {
+    const usuarios = await this.prisma.usuario.findMany({
+      select: { id: true },
+    });
     for (const u of usuarios) {
       const prefs = await this.prefsDoUsuario(u.id);
       if (prefs[flag] === false) continue;

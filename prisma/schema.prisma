@@ -69,17 +69,25 @@ model MembroEquipe {
   criadoEm DateTime @default(now())
 }
 
+enum Role {
+  ADMIN
+  ADVOGADO
+  ASSISTENTE
+}
+
 model Usuario {
   id        String   @id @default(uuid())
   nome      String
   email     String   @unique
   senhaHash String
+  role      Role     @default(ASSISTENTE)
   fotoUrl   String?
   criadoEm  DateTime @default(now())
 
-  preferencia Preferencia?
-  inbox       InboxItem[]
-  contatos    ContatoLog[]
+  preferencia   Preferencia?
+  inbox         InboxItem[]
+  contatos      ContatoLog[]
+  conversacoes  Conversacao[]
 }
 
 model Preferencia {
@@ -128,10 +136,15 @@ model Conversacao {
   titulo     String
   processoId String?
   processo   Processo? @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  usuarioId  String
+  usuario    Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   criadoEm   DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
   mensagens Mensagem[]
+
+  @@index([usuarioId, processoId])
+  @@index([usuarioId, atualizadoEm])
 }
 
 model Mensagem {

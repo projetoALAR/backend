@@ -3,10 +3,12 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma.service';
+import { Role } from './roles';
 
 export type JwtPayload = {
   sub: string;
   email: string;
+  role?: Role;
 };
 
 @Injectable()
@@ -18,7 +20,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get<string>('JWT_SECRET') || 'alar-dev-secret-change-me',
+      secretOrKey:
+        config.get<string>('JWT_SECRET') || 'alar-dev-secret-change-me',
     });
   }
 
@@ -31,7 +34,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Usuário não encontrado');
     }
 
-    const { senhaHash: _, ...user } = usuario;
+    const { senhaHash: _senhaHash, ...user } = usuario;
+    void _senhaHash;
     return user;
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { Prisma } from '@prisma/client';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
+import { CreateCompromissoDto, UpdateCompromissoDto } from './compromissos.dto';
 
 @Injectable()
 export class CompromissosService {
@@ -10,9 +10,14 @@ export class CompromissosService {
     private notificacoes: NotificacoesService,
   ) {}
 
-  async criar(dados: Prisma.CompromissoUncheckedCreateInput) {
+  async criar(dados: CreateCompromissoDto) {
     const compromisso = await this.prisma.compromisso.create({
-      data: dados,
+      data: {
+        titulo: dados.titulo.trim(),
+        descricao: dados.descricao,
+        dataHora: new Date(dados.dataHora),
+        processoId: dados.processoId ?? null,
+      },
     });
 
     const quando = new Date(compromisso.dataHora).toLocaleString('pt-BR');
@@ -37,10 +42,21 @@ export class CompromissosService {
     });
   }
 
-  async atualizar(id: string, dados: Prisma.CompromissoUncheckedUpdateInput) {
+  async atualizar(id: string, dados: UpdateCompromissoDto) {
     return this.prisma.compromisso.update({
       where: { id },
-      data: dados,
+      data: {
+        ...(dados.titulo !== undefined ? { titulo: dados.titulo.trim() } : {}),
+        ...(dados.descricao !== undefined
+          ? { descricao: dados.descricao }
+          : {}),
+        ...(dados.dataHora !== undefined
+          ? { dataHora: new Date(dados.dataHora) }
+          : {}),
+        ...(dados.processoId !== undefined
+          ? { processoId: dados.processoId }
+          : {}),
+      },
     });
   }
 

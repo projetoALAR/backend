@@ -15,10 +15,45 @@ export class ChatService {
     private chatContext: ChatContextService,
   ) {}
 
-  /** Apenas conversas do chat geral (sem vínculo com processo). */
-  async listarConversas() {
+  private async assertDonoGeral(id: string, usuarioId: string) {
+    const conversa = await this.prisma.conversacao.findUnique({ where: { id } });
+    if (!conversa) {
+      throw new NotFoundException('Conversa não encontrada.');
+    }
+    if (conversa.processoId) {
+      throw new ForbiddenException(
+        'Esta conversa pertence a um caso e só pode ser acessada pelo chat do painel do processo.',
+      );
+    }
+    if (conversa.usuarioId !== usuarioId) {
+      throw new ForbiddenException('Você não tem acesso a esta conversa.');
+    }
+    return conversa;
+  }
+
+  private async assertAcessoMensagem(id: string, usuarioId: string) {
+    const conversa = await this.prisma.conversacao.findUnique({
+      where: { id },
+      include: {
+        mensagens: {
+          orderBy: { criadoEm: 'asc' },
+          take: 20,
+        },
+      },
+    });
+    if (!conversa) {
+      throw new NotFoundException('Conversa não encontrada.');
+    }
+    if (conversa.usuarioId !== usuarioId) {
+      throw new ForbiddenException('Você não tem acesso a esta conversa.');
+    }
+    return conversa;
+  }
+
+  /** Apenas conversas do chat geral do usuário logado. */
+  async listarConversas(usuarioId: string) {
     return this.prisma.conversacao.findMany({
-      where: { processoId: null },
+      where: { processoId: null, usuarioId },
       orderBy: { atualizadoEm: 'desc' },
       include: {
         mensagens: {
@@ -30,42 +65,33 @@ export class ChatService {
     });
   }
 
-  /**
-   * Abre conversa do chat geral.
-   * Conversas de caso (processoId preenchido) são bloqueadas aqui.
-   */
-  async obterConversa(id: string) {
-    const conversa = await this.prisma.conversacao.findUnique({
+  async obterConversa(id: string, usuarioId: string) {
+    await this.assertDonoGeral(id, usuarioId);
+    return this.prisma.conversacao.findUnique({
       where: { id },
       include: {
         mensagens: { orderBy: { criadoEm: 'asc' } },
       },
     });
-    if (!conversa) {
-      throw new NotFoundException('Conversa não encontrada.');
-    }
-    if (conversa.processoId) {
-      throw new ForbiddenException(
-        'Esta conversa pertence a um caso e só pode ser acessada pelo chat do painel do processo.',
-      );
-    }
-    return conversa;
   }
 
-  async criarConversa(dados: { titulo?: string; processoId?: string }) {
-    // Chat geral nunca aceita processoId por esta rota pública de criação “livre”
+  async criarConversa(
+    usuarioId: string,
+    dados: { titulo?: string; processoId?: string },
+  ) {
     const titulo = dados.titulo?.trim() || 'Nova conversa';
     return this.prisma.conversacao.create({
       data: {
         titulo,
         processoId: null,
+        usuarioId,
       },
       include: { mensagens: true },
     });
   }
 
-  /** Chat exclusivo do caso — isolado do chat geral. */
-  async obterOuCriarPorProcesso(processoId: string) {
+  /** Chat exclusivo do caso — uma thread por usuário por processo. */
+  async obterOuCriarPorProcesso(processoId: string, usuarioId: string) {
     const processo = await this.prisma.processo.findUnique({
       where: { id: processoId },
       select: { id: true, titulo: true, numero: true },
@@ -75,7 +101,7 @@ export class ChatService {
     }
 
     const existente = await this.prisma.conversacao.findFirst({
-      where: { processoId },
+      where: { processoId, usuarioId },
       include: { mensagens: { orderBy: { criadoEm: 'asc' } } },
       orderBy: { criadoEm: 'asc' },
     });
@@ -85,24 +111,18 @@ export class ChatService {
       data: {
         titulo: `Caso: ${processo.titulo || processo.numero}`,
         processoId,
+        usuarioId,
       },
       include: { mensagens: true },
     });
   }
 
-  async enviarMensagem(conversacaoId: string, conteudo: string) {
-    const conversa = await this.prisma.conversacao.findUnique({
-      where: { id: conversacaoId },
-      include: {
-        mensagens: {
-          orderBy: { criadoEm: 'asc' },
-          take: 20,
-        },
-      },
-    });
-    if (!conversa) {
-      throw new NotFoundException('Conversa não encontrada.');
-    }
+  async enviarMensagem(
+    conversacaoId: string,
+    conteudo: string,
+    usuarioId: string,
+  ) {
+    const conversa = await this.assertAcessoMensagem(conversacaoId, usuarioId);
 
     const mensagemUsuario = await this.prisma.mensagem.create({
       data: {
@@ -167,18 +187,8 @@ export class ChatService {
     return { mensagemUsuario, mensagemIa };
   }
 
-  async removerConversa(id: string) {
-    const conversa = await this.prisma.conversacao.findUnique({
-      where: { id },
-    });
-    if (!conversa) {
-      throw new NotFoundException('Conversa não encontrada.');
-    }
-    if (conversa.processoId) {
-      throw new ForbiddenException(
-        'Conversas de caso não podem ser removidas pelo chat geral.',
-      );
-    }
+  async removerConversa(id: string, usuarioId: string) {
+    await this.assertDonoGeral(id, usuarioId);
     return this.prisma.conversacao.delete({ where: { id } });
   }
 }
