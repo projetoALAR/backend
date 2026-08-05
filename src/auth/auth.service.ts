@@ -40,13 +40,13 @@ export class AuthService implements OnModuleInit {
     const nome = this.config.get<string>('AUTH_ADMIN_NOME') || 'Administrador';
 
     const senhaHash = await bcrypt.hash(password, 10);
-    await this.prisma.usuario.create({
+    const usuario = await this.prisma.usuario.create({
       data: { nome, email, senhaHash },
     });
 
     await this.prisma.preferencia.upsert({
-      where: { id: 'default' },
-      create: { id: 'default', nome, email },
+      where: { usuarioId: usuario.id },
+      create: { usuarioId: usuario.id, nome, email },
       update: { nome, email },
     });
   }
@@ -89,6 +89,14 @@ export class AuthService implements OnModuleInit {
         nome: dados.nome.trim(),
         email,
         senhaHash,
+      },
+    });
+
+    await this.prisma.preferencia.create({
+      data: {
+        usuarioId: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
       },
     });
 

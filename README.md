@@ -35,6 +35,19 @@ Variáveis de ambiente do backend:
 - `AUTH_ADMIN_PASSWORD` — senha do admin (padrão: `admin123`)
 - `AUTH_ADMIN_NOME` — nome do admin (padrão: `Administrador`)
 
+### Chat IA (OpenAI-compatible)
+
+- `OPENAI_API_KEY` — chave da API (sem ela, usa respostas mock)
+- `OPENAI_BASE_URL` — opcional (padrão `https://api.openai.com/v1`; use Groq/outro compatível)
+- `OPENAI_MODEL` — opcional (padrão `gpt-4o-mini`)
+
+### E-mail (SMTP)
+
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+- `SMTP_SECURE=true` para TLS implícito
+
+Sem SMTP, avisos ainda vão para a caixa de mensagens (`/inbox` / página Mensagens).
+
 No primeiro start, se a tabela `Usuario` estiver vazia, o admin é criado automaticamente.
 
 Endpoints públicos: `POST /auth/login`, `POST /auth/register`, `GET /`. Demais rotas exigem `Authorization: Bearer <token>`.

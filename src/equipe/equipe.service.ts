@@ -1,13 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { Prisma } from '@prisma/client';
+import { NotificacoesService } from '../notificacoes/notificacoes.service';
 
 @Injectable()
 export class EquipeService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificacoes: NotificacoesService,
+  ) {}
 
   async criar(dados: Prisma.MembroEquipeCreateInput) {
-    return this.prisma.membroEquipe.create({ data: dados });
+    const membro = await this.prisma.membroEquipe.create({ data: dados });
+    await this.notificacoes.notificarTodosUsuarios(
+      'Novo membro na equipe',
+      `${membro.nome} (${membro.cargo}) foi adicionado à equipe.`,
+      '/team',
+      'teamUpdates',
+    );
+    return membro;
   }
 
   async listarTodos() {

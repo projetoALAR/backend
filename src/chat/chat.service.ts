@@ -1,17 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-
-const RESPOSTAS_MOCK = [
-  'Com base nos dados do processo, recomendo revisar os prazos processuais e a documentação anexada.',
-  'Esse ponto geralmente exige análise da jurisprudência recente. Posso ajudar a organizar os próximos passos.',
-  'Sugiro validar as partes, o objeto e a forma do ato jurídico antes de avançar com a petição.',
-  'Para esse cenário, um checklist de documentos e um cronograma de audiências costuma reduzir riscos.',
-  'Entendi. Vamos priorizar os prazos mais próximos e alinhar as tarefas da equipe.',
-];
+import { LlmService } from './llm.service';
 
 @Injectable()
 export class ChatService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private llm: LlmService,
+  ) {}
 
   async listarConversas() {
     return this.prisma.conversacao.findMany({
@@ -70,6 +66,12 @@ export class ChatService {
   async enviarMensagem(conversacaoId: string, conteudo: string) {
     const conversa = await this.prisma.conversacao.findUnique({
       where: { id: conversacaoId },
+      include: {
+        mensagens: {
+          orderBy: { criadoEm: 'asc' },
+          take: 20,
+        },
+      },
     });
     if (!conversa) {
       throw new NotFoundException('Conversa não encontrada.');
@@ -83,8 +85,12 @@ export class ChatService {
       },
     });
 
-    const resposta =
-      RESPOSTAS_MOCK[Math.floor(Math.random() * RESPOSTAS_MOCK.length)];
+    const historico = conversa.mensagens.map((m) => ({
+      role: (m.isUser ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: m.conteudo,
+    }));
+
+    const resposta = await this.llm.gerarRespostaJuridica(conteudo, historico);
 
     const mensagemIa = await this.prisma.mensagem.create({
       data: {

@@ -76,10 +76,16 @@ model Usuario {
   senhaHash String
   fotoUrl   String?
   criadoEm  DateTime @default(now())
+
+  preferencia Preferencia?
+  inbox       InboxItem[]
+  contatos    ContatoLog[]
 }
 
 model Preferencia {
-  id                 String   @id @default("default")
+  id                 String   @id @default(uuid())
+  usuarioId          String   @unique
+  usuario            Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   nome               String   @default("")
   email              String   @default("")
   fotoUrl            String?
@@ -87,6 +93,34 @@ model Preferencia {
   notificacoesLidas  Json     @default("[]")
   tema               String   @default("light")
   atualizadoEm       DateTime @updatedAt
+}
+
+model InboxItem {
+  id         String   @id @default(uuid())
+  usuarioId  String
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  titulo     String
+  corpo      String
+  tipo       String   @default("sistema")
+  lida       Boolean  @default(false)
+  link       String?
+  criadoEm   DateTime @default(now())
+
+  @@index([usuarioId, lida])
+}
+
+model ContatoLog {
+  id          String   @id @default(uuid())
+  usuarioId   String
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  alvoTipo    String
+  alvoId      String
+  alvoNome    String
+  canal       String
+  observacao  String?
+  criadoEm    DateTime @default(now())
+
+  @@index([usuarioId, criadoEm])
 }
 
 model Conversacao {

@@ -25,8 +25,8 @@ export class PreferenciasController {
   constructor(private readonly preferenciasService: PreferenciasService) {}
 
   @Get()
-  async obter() {
-    return this.preferenciasService.obter();
+  async obter(@CurrentUser() user: { id: string }) {
+    return this.preferenciasService.obter(user.id);
   }
 
   @Put()

@@ -13,6 +13,7 @@ import { DocumentosModule } from './documentos/documentos.module';
 import { EquipeModule } from './equipe/equipe.module';
 import { PreferenciasModule } from './preferencias/preferencias.module';
 import { ChatModule } from './chat/chat.module';
+import { NotificacoesModule } from './notificacoes/notificacoes.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ChatModule } from './chat/chat.module';
     EquipeModule,
     PreferenciasModule,
     ChatModule,
+    NotificacoesModule,
   ],
   controllers: [AppController],
   providers: [

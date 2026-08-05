@@ -8,8 +8,6 @@ import { Prisma } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
 import 'multer';
 
-const DEFAULT_ID = 'default';
-
 type PreferenciaUpdateBody = {
   nome?: string;
   email?: string;
@@ -30,16 +28,25 @@ export class PreferenciasService {
     );
   }
 
-  async obter() {
+  async obter(userId: string) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+    });
+
     return this.prisma.preferencia.upsert({
-      where: { id: DEFAULT_ID },
-      create: { id: DEFAULT_ID },
+      where: { usuarioId: userId },
+      create: {
+        usuarioId: userId,
+        nome: usuario?.nome || '',
+        email: usuario?.email || '',
+        fotoUrl: usuario?.fotoUrl,
+      },
       update: {},
     });
   }
 
-  async atualizar(dados: PreferenciaUpdateBody, userId?: string) {
-    await this.obter();
+  async atualizar(dados: PreferenciaUpdateBody, userId: string) {
+    await this.obter(userId);
 
     const data: Prisma.PreferenciaUpdateInput = {};
     if (dados.nome !== undefined) data.nome = dados.nome;
@@ -52,11 +59,15 @@ export class PreferenciasService {
     if (dados.tema !== undefined) data.tema = dados.tema;
 
     const preferencia = await this.prisma.preferencia.update({
-      where: { id: DEFAULT_ID },
+      where: { usuarioId: userId },
       data,
     });
 
-    if (userId && (dados.nome !== undefined || dados.email !== undefined || dados.fotoUrl !== undefined)) {
+    if (
+      dados.nome !== undefined ||
+      dados.email !== undefined ||
+      dados.fotoUrl !== undefined
+    ) {
       const userData: Prisma.UsuarioUpdateInput = {};
       if (dados.nome !== undefined) userData.nome = dados.nome;
       if (dados.email !== undefined) userData.email = dados.email;
@@ -98,8 +109,6 @@ export class PreferenciasService {
       .from('documentos')
       .getPublicUrl(nomeUnico);
 
-    const fotoUrl = publicUrlData.publicUrl;
-
-    return this.atualizar({ fotoUrl }, userId);
+    return this.atualizar({ fotoUrl: publicUrlData.publicUrl }, userId);
   }
 }

@@ -1,23 +1,37 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { Prisma } from '@prisma/client';
+import { NotificacoesService } from '../notificacoes/notificacoes.service';
 
 @Injectable()
 export class CompromissosService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificacoes: NotificacoesService,
+  ) {}
 
   async criar(dados: Prisma.CompromissoUncheckedCreateInput) {
-    return this.prisma.compromisso.create({
+    const compromisso = await this.prisma.compromisso.create({
       data: dados,
     });
+
+    const quando = new Date(compromisso.dataHora).toLocaleString('pt-BR');
+    await this.notificacoes.notificarTodosUsuarios(
+      'Novo compromisso',
+      `${compromisso.titulo} em ${quando}`,
+      '/calendar',
+      'reminders',
+    );
+
+    return compromisso;
   }
 
   async listarTodos() {
     return this.prisma.compromisso.findMany({
-      orderBy: { dataHora: 'asc' }, // Ordena do mais próximo para o mais distante
+      orderBy: { dataHora: 'asc' },
       include: {
         processo: {
-          select: { numero: true }, // Traz apenas o número do processo para não pesar a query
+          select: { numero: true },
         },
       },
     });
