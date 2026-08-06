@@ -1,3 +1,5 @@
+import './instrument';
+
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
@@ -40,10 +42,16 @@ async function bootstrap() {
   app.enableCors({
     origin: origins === false ? false : origins,
     credentials: true,
+    exposedHeaders: ['x-request-id'],
   });
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   logger.log(`API Alar ouvindo na porta ${port}`);
+  if (process.env.SENTRY_DSN?.trim()) {
+    logger.log('Sentry habilitado');
+  } else {
+    logger.log('Sentry desligado (defina SENTRY_DSN para ativar)');
+  }
 }
 void bootstrap();
