@@ -10,10 +10,13 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '../auth/roles';
 import { NotificacoesService } from './notificacoes.service';
 import { CreateContatoDto } from '../common/common.dto';
 
 @Controller()
+@Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
 export class InboxController {
   constructor(
     private readonly prisma: PrismaService,

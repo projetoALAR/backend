@@ -23,6 +23,7 @@ export class ClientesController {
     return this.clientesService.criar(dados);
   }
 
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get()
   async listarTodos() {
     return this.clientesService.listarTodos();

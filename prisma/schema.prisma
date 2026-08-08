@@ -18,17 +18,19 @@ model Cliente {
 }
 
 model Processo {
-  id           String    @id @default(uuid())
-  numero       String    @unique
-  status       String
-  descricao    String?
-  titulo       String?
-  prioridade   String?
-  prazo        DateTime?
-  tags         Json?
-  concluido    Boolean   @default(false)
-  criadoEm     DateTime  @default(now())
-  atualizadoEm DateTime  @updatedAt
+  id            String    @id @default(uuid())
+  numero        String    @unique
+  status        String
+  descricao     String?
+  titulo        String?
+  prioridade    String?
+  prazo         DateTime?
+  tags          Json?
+  concluido     Boolean   @default(false)
+  /// Cache da sigla DataJud resolvida a partir do número CNJ (ex.: tjsp, trf1)
+  tribunalSigla String?
+  criadoEm      DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
 
   clienteId String
   cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
@@ -36,6 +38,27 @@ model Processo {
   compromissos Compromisso[]
   documentos   Documento[]
   conversas    Conversacao[]
+  andamentos   Andamento[]
+
+  @@index([clienteId])
+  @@index([concluido])
+  @@index([prazo])
+  @@index([status])
+  @@index([atualizadoEm])
+}
+
+model Andamento {
+  id              String   @id @default(uuid())
+  processoId      String
+  processo        Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  data            DateTime
+  descricao       String
+  codigoMovimento Int?
+  /// Payload bruto do provider (DataJud hoje; outros no futuro)
+  origem          Json?
+  criadoEm        DateTime @default(now())
+
+  @@index([processoId, data])
 }
 
 model Compromisso {
@@ -47,6 +70,9 @@ model Compromisso {
 
   processoId String?
   processo   Processo? @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  @@index([dataHora])
+  @@index([processoId])
 }
 
 model Documento {
@@ -58,15 +84,22 @@ model Documento {
 
   processoId String
   processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  @@index([processoId])
 }
 
 model MembroEquipe {
-  id       String   @id @default(uuid())
-  nome     String
-  email    String
-  cargo    String
-  status   String   @default("active")
-  criadoEm DateTime @default(now())
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  cargo     String
+  status    String   @default("active")
+  criadoEm  DateTime @default(now())
+
+  usuarioId String?  @unique
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([status])
 }
 
 enum Role {
@@ -84,10 +117,11 @@ model Usuario {
   fotoUrl   String?
   criadoEm  DateTime @default(now())
 
-  preferencia   Preferencia?
-  inbox         InboxItem[]
-  contatos      ContatoLog[]
-  conversacoes  Conversacao[]
+  preferencia  Preferencia?
+  inbox        InboxItem[]
+  contatos     ContatoLog[]
+  conversacoes Conversacao[]
+  membroEquipe MembroEquipe?
 }
 
 model Preferencia {

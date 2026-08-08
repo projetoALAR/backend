@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
 import { AppController } from './app.controller';
@@ -17,6 +18,7 @@ import { EquipeModule } from './equipe/equipe.module';
 import { PreferenciasModule } from './preferencias/preferencias.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificacoesModule } from './notificacoes/notificacoes.module';
+import { AndamentosModule } from './andamentos/andamentos.module';
 import { PrismaService } from './prisma.service';
 import { RequestLoggingMiddleware } from './common/request-logging.middleware';
 
@@ -24,6 +26,7 @@ import { RequestLoggingMiddleware } from './common/request-logging.middleware';
   imports: [
     SentryModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         name: 'default',
@@ -41,6 +44,7 @@ import { RequestLoggingMiddleware } from './common/request-logging.middleware';
     PreferenciasModule,
     ChatModule,
     NotificacoesModule,
+    AndamentosModule,
   ],
   controllers: [AppController],
   providers: [

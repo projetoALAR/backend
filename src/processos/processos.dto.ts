@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
@@ -14,6 +15,16 @@ import {
 const NUMERO_PROCESSO_REGEX =
   /^(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}|[A-Za-z0-9][\w./-]{0,79})$/;
 
+export const PROCESSO_STATUS = [
+  'Em andamento',
+  'Aguardando',
+  'Em análise',
+  'Audiência marcada',
+  'Suspenso',
+  'Concluído',
+  'Arquivado',
+] as const;
+
 export class CreateProcessoDto {
   @IsString()
   @MinLength(1)
@@ -25,7 +36,9 @@ export class CreateProcessoDto {
   numero!: string;
 
   @IsString()
-  @MinLength(1)
+  @IsIn([...PROCESSO_STATUS], {
+    message: `Status inválido. Use: ${PROCESSO_STATUS.join(', ')}`,
+  })
   status!: string;
 
   @IsUUID()
@@ -70,6 +83,7 @@ export class UpdateProcessoDto {
 
   @IsOptional()
   @IsString()
+  @MinLength(1)
   status?: string;
 
   @IsOptional()

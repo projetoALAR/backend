@@ -23,11 +23,13 @@ export class ProcessosController {
     return this.processosService.criar(dados);
   }
 
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get('cliente/:clienteId')
   async listarPorCliente(@Param('clienteId', ParseUUIDPipe) clienteId: string) {
     return this.processosService.listarPorCliente(clienteId);
   }
 
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get()
   async listarTodos() {
     return this.processosService.listarTodos();

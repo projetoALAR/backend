@@ -30,6 +30,7 @@ export class DocumentosController {
     return this.documentosService.fazerUpload(body.processoId, arquivo);
   }
 
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get('processo/:processoId')
   async listarPorProcesso(
     @Param('processoId', ParseUUIDPipe) processoId: string,

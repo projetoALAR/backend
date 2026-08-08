@@ -86,10 +86,19 @@ export class ProcessosService {
   }
 
   async atualizar(id: string, dados: UpdateProcessoDto) {
+    const numeroNovo =
+      dados.numero !== undefined ? dados.numero.trim() : undefined;
+
     return this.prisma.processo.update({
       where: { id },
       data: {
-        ...(dados.numero !== undefined ? { numero: dados.numero.trim() } : {}),
+        ...(numeroNovo !== undefined
+          ? {
+              numero: numeroNovo,
+              // Recalcula o índice DataJud na próxima sincronização
+              tribunalSigla: null,
+            }
+          : {}),
         ...(dados.status !== undefined ? { status: dados.status } : {}),
         ...(dados.clienteId !== undefined
           ? { clienteId: dados.clienteId }

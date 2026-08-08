@@ -23,6 +23,7 @@ export class CompromissosController {
     return this.compromissosService.criar(dados);
   }
 
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get()
   async listarTodos() {
     return this.compromissosService.listarTodos();

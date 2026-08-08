@@ -101,6 +101,8 @@ export class NotificacoesService {
     texto: string,
     link?: string,
     flag: keyof NotificacoesPrefs = 'reminders',
+    /** Tipo do InboxItem; padrão = flag de preferência */
+    tipo?: string,
   ) {
     const usuarios = await this.prisma.usuario.findMany({
       select: { id: true },
@@ -112,7 +114,7 @@ export class NotificacoesService {
         usuarioId: u.id,
         titulo: assunto,
         corpo: texto,
-        tipo: flag,
+        tipo: tipo || flag,
         link,
       });
       if (prefs.email !== false) {
