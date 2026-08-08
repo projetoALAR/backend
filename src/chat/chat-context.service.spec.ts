@@ -13,6 +13,7 @@ describe('ChatContextService', () => {
       findUnique: jest.fn(),
     },
     membroEquipe: { count: jest.fn() },
+    andamento: { findMany: jest.fn() },
   };
 
   const documentos = {
@@ -87,11 +88,25 @@ describe('ChatContextService', () => {
       documentos: [],
       _count: { documentos: 0, compromissos: 0 },
     });
+    prisma.andamento.findMany.mockResolvedValue([
+      {
+        data: new Date('2024-02-01'),
+        descricao: 'Distribuição',
+      },
+    ]);
 
     const resultado = await service.montarContextoCaso('p1');
     expect(resultado.textoContexto).toContain('Caso teste');
     expect(resultado.textoContexto).toContain('Cliente X');
     expect(resultado.textoContexto).toContain('Objeto do caso');
+    expect(resultado.textoContexto).toContain('## Andamentos recentes');
+    expect(resultado.textoContexto).toContain('Distribuição');
     expect(resultado.imagensUrls).toEqual([]);
+    expect(prisma.andamento.findMany).toHaveBeenCalledWith({
+      where: { processoId: 'p1' },
+      orderBy: { data: 'desc' },
+      take: 20,
+      select: { data: true, descricao: true },
+    });
   });
 });

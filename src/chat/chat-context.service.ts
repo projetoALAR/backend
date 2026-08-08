@@ -237,6 +237,22 @@ export class ChatContextService {
       }
     }
 
+    const andamentos = await this.prisma.andamento.findMany({
+      where: { processoId },
+      orderBy: { data: 'desc' },
+      take: 20,
+      select: { data: true, descricao: true },
+    });
+
+    linhas.push('', '## Andamentos recentes');
+    if (andamentos.length === 0) {
+      linhas.push('- Nenhum andamento sincronizado.');
+    } else {
+      for (const a of andamentos) {
+        linhas.push(`- ${a.data.toISOString().slice(0, 10)} | ${a.descricao}`);
+      }
+    }
+
     linhas.push('', `## Arquivos do caso (${processo._count.documentos})`);
 
     const imagensUrls: string[] = [];

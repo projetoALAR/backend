@@ -7,12 +7,43 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import PDFDocument from 'pdfkit';
 import { PrismaService } from '../prisma.service';
 import { DOCUMENTO_MIME_ALLOWLIST } from './documentos.dto';
 import 'multer';
 
 const BUCKET = 'documentos';
 const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1h
+
+/** Helvetica do PDFKit não cobre acentuação PT — remove diacríticos só no PDF. */
+function textoParaPdfLatin1(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split('')
+    .map((ch) => {
+      const code = ch.charCodeAt(0);
+      if (ch === '\n' || ch === '\r' || ch === '\t') return ch;
+      if (code >= 0x20 && code <= 0x7e) return ch;
+      return '';
+    })
+    .join('');
+}
+
+function renderizarPdfDeTexto(texto: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (c: Buffer) => chunks.push(c));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    doc
+      .font('Helvetica')
+      .fontSize(10)
+      .text(textoParaPdfLatin1(texto), { align: 'justify', lineGap: 2 });
+    doc.end();
+  });
+}
 
 @Injectable()
 export class DocumentosService {
@@ -129,6 +160,65 @@ export class DocumentosService {
         // Guarda o path no bucket; a URL assinada é gerada na leitura
         urlArquivo: storagePath,
         tamanho: arquivo.size,
+        processoId,
+      },
+    });
+
+    return this.withSignedUrl(documento);
+  }
+
+  /**
+   * Gera PDF a partir de texto, faz upload e cria o Documento do processo.
+   */
+  async criarDocumentoDeTexto(
+    processoId: string,
+    nomeArquivo: string,
+    conteudoTexto: string,
+  ) {
+    if (!processoId) {
+      throw new BadRequestException('processoId obrigatório');
+    }
+    const nome = nomeArquivo.trim();
+    if (!nome) {
+      throw new BadRequestException('nomeArquivo obrigatório');
+    }
+    if (!conteudoTexto?.trim()) {
+      throw new BadRequestException('conteudoTexto obrigatório');
+    }
+
+    const processo = await this.prisma.processo.findUnique({
+      where: { id: processoId },
+    });
+    if (!processo) {
+      throw new NotFoundException('Processo não encontrado');
+    }
+
+    const nomeComExt = nome.toLowerCase().endsWith('.pdf')
+      ? nome
+      : `${nome}.pdf`;
+    const safeName = nomeComExt.replace(/[^\w.-]+/g, '_');
+    const storagePath = `${processoId}/${Date.now()}-${safeName}`;
+    const pdfBuffer = await renderizarPdfDeTexto(conteudoTexto);
+
+    const { error: uploadError } = await this.supabase.storage
+      .from(BUCKET)
+      .upload(storagePath, pdfBuffer, {
+        contentType: 'application/pdf',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      this.logger.error(uploadError.message);
+      throw new InternalServerErrorException(
+        'Erro ao enviar arquivo para a nuvem.',
+      );
+    }
+
+    const documento = await this.prisma.documento.create({
+      data: {
+        nome: nomeComExt,
+        urlArquivo: storagePath,
+        tamanho: pdfBuffer.length,
         processoId,
       },
     });

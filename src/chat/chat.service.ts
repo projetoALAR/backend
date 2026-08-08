@@ -135,7 +135,7 @@ export class ChatService {
     });
 
     const historico = conversa.mensagens.map((m) => ({
-      role: m.isUser ? 'user' : 'assistant',
+      role: (m.isUser ? 'user' : 'assistant') as 'user' | 'assistant',
       content: m.conteudo,
     }));
 
