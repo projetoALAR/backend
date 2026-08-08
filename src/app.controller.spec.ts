@@ -45,10 +45,7 @@ describe('AppController', () => {
       };
       const module: TestingModule = await Test.createTestingModule({
         controllers: [AppController],
-        providers: [
-          AppService,
-          { provide: PrismaService, useValue: prisma },
-        ],
+        providers: [AppService, { provide: PrismaService, useValue: prisma }],
       }).compile();
       const ctrl = module.get<AppController>(AppController);
       await expect(ctrl.health()).rejects.toBeInstanceOf(

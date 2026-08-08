@@ -1,6 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { LoginDto, RegisterDto } from './auth.dto';
+import { LoginDto, RegisterDto, ChangePasswordDto } from './auth.dto';
 
 describe('Auth DTOs', () => {
   it('rejeita login sem e-mail válido', async () => {
@@ -26,5 +26,14 @@ describe('Auth DTOs', () => {
     });
     const errors = await validate(dto);
     expect(errors.some((e) => e.property === 'senha')).toBe(true);
+  });
+
+  it('exige nova senha com 8+ caracteres', async () => {
+    const dto = plainToInstance(ChangePasswordDto, {
+      senhaAtual: 'antiga-senha',
+      novaSenha: '123',
+    });
+    const errors = await validate(dto);
+    expect(errors.some((e) => e.property === 'novaSenha')).toBe(true);
   });
 });

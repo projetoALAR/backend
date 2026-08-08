@@ -1,0 +1,140 @@
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcryptjs';
+import { AuthService } from './auth.service';
+import { PrismaService } from '../prisma.service';
+import { DocumentosService } from '../documentos/documentos.service';
+import { EquipeService } from '../equipe/equipe.service';
+import { Role } from './roles';
+
+jest.mock('bcryptjs', () => ({
+  compare: jest.fn(),
+  hash: jest.fn(),
+}));
+
+describe('AuthService.changePassword', () => {
+  let service: AuthService;
+  const prisma = {
+    usuario: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+  };
+  const documentos = { resolveSignedUrl: jest.fn() };
+  const equipe = { ensureMembroForUsuario: jest.fn() };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new AuthService(
+      prisma as unknown as PrismaService,
+      {} as JwtService,
+      {} as ConfigService,
+      documentos as unknown as DocumentosService,
+      equipe as unknown as EquipeService,
+    );
+  });
+
+  it('rejeita senha atual incorreta', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u1',
+      senhaHash: 'hash',
+    });
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+    await expect(
+      service.changePassword('u1', 'errada', 'nova-senha-ok'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejeita nova senha igual à atual', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u1',
+      senhaHash: 'hash',
+    });
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+    await expect(
+      service.changePassword('u1', 'mesma-senha', 'mesma-senha'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('atualiza hash quando senha atual confere', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u1',
+      senhaHash: 'hash-antigo',
+    });
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    (bcrypt.hash as jest.Mock).mockResolvedValue('hash-novo');
+    prisma.usuario.update.mockResolvedValue({});
+
+    await expect(
+      service.changePassword('u1', 'antiga-senha', 'nova-senha-ok'),
+    ).resolves.toEqual({ ok: true });
+
+    expect(prisma.usuario.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { senhaHash: 'hash-novo' },
+    });
+  });
+
+  it('falha se usuário não existe', async () => {
+    prisma.usuario.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.changePassword('missing', 'a', 'nova-senha-ok'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+});
+
+describe('AuthService.createUserByAdmin', () => {
+  it('sincroniza membro na equipe após criar usuário', async () => {
+    const prisma = {
+      usuario: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({
+          id: 'u2',
+          nome: 'Ana',
+          email: 'ana@alar.com.br',
+          role: Role.ASSISTENTE,
+          fotoUrl: null,
+          criadoEm: new Date(),
+          senhaHash: 'x',
+        }),
+      },
+      preferencia: { create: jest.fn() },
+    };
+    const documentos = {
+      resolveSignedUrl: jest.fn(),
+    };
+    const equipe = {
+      ensureMembroForUsuario: jest.fn().mockResolvedValue({}),
+    };
+
+    (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
+
+    const service = new AuthService(
+      prisma as unknown as PrismaService,
+      { sign: jest.fn() } as unknown as JwtService,
+      {} as ConfigService,
+      documentos as unknown as DocumentosService,
+      equipe as unknown as EquipeService,
+    );
+
+    const result = await service.createUserByAdmin({
+      nome: 'Ana',
+      email: 'ana@alar.com.br',
+      senha: 'senha-forte',
+      role: Role.ASSISTENTE,
+    });
+
+    expect(result.user.email).toBe('ana@alar.com.br');
+    expect(equipe.ensureMembroForUsuario).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'u2',
+        email: 'ana@alar.com.br',
+        role: Role.ASSISTENTE,
+      }),
+    );
+  });
+});

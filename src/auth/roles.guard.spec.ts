@@ -32,11 +32,11 @@ describe('RolesGuard', () => {
     expect(guard.canActivate(mockContext())).toBe(true);
   });
 
-  it('permite quando não há @Roles', () => {
+  it('bloqueia quando não há @Roles (fail-closed)', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined);
-    expect(guard.canActivate(mockContext({ role: Role.ASSISTENTE }))).toBe(
-      true,
-    );
+    expect(() =>
+      guard.canActivate(mockContext({ role: Role.ASSISTENTE })),
+    ).toThrow(ForbiddenException);
   });
 
   it('permite papel autorizado', () => {
