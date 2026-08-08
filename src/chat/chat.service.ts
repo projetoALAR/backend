@@ -16,7 +16,9 @@ export class ChatService {
   ) {}
 
   private async assertDonoGeral(id: string, usuarioId: string) {
-    const conversa = await this.prisma.conversacao.findUnique({ where: { id } });
+    const conversa = await this.prisma.conversacao.findUnique({
+      where: { id },
+    });
     if (!conversa) {
       throw new NotFoundException('Conversa não encontrada.');
     }
@@ -133,31 +135,37 @@ export class ChatService {
     });
 
     const historico = conversa.mensagens.map((m) => ({
-      role: (m.isUser ? 'user' : 'assistant') as 'user' | 'assistant',
+      role: m.isUser ? 'user' : 'assistant',
       content: m.conteudo,
     }));
 
     let resposta: string;
-    if (conversa.processoId) {
-      const caso = await this.chatContext.montarContextoCaso(
-        conversa.processoId,
-        conteudo,
-      );
-      const pedeArquivos = this.chatContext.perguntaPedeArquivos(conteudo);
-      resposta = await this.llm.gerarRespostaJuridica(conteudo, historico, {
-        modo: 'caso',
-        contextoTexto: caso.textoContexto,
-        imagensUrls: caso.imagensUrls,
-        detalheImagem: pedeArquivos ? 'high' : 'auto',
-      });
-    } else {
-      const contextoProjeto = await this.chatContext.montarContexto({
-        pergunta: conteudo,
-      });
-      resposta = await this.llm.gerarRespostaJuridica(conteudo, historico, {
-        modo: 'workspace',
-        contextoTexto: contextoProjeto,
-      });
+    try {
+      if (conversa.processoId) {
+        const caso = await this.chatContext.montarContextoCaso(
+          conversa.processoId,
+          conteudo,
+        );
+        const pedeArquivos = this.chatContext.perguntaPedeArquivos(conteudo);
+        resposta = await this.llm.gerarRespostaJuridica(conteudo, historico, {
+          modo: 'caso',
+          contextoTexto: caso.textoContexto,
+          imagensUrls: caso.imagensUrls,
+          detalheImagem: pedeArquivos ? 'high' : 'auto',
+        });
+      } else {
+        const contextoProjeto = await this.chatContext.montarContexto({
+          pergunta: conteudo,
+        });
+        resposta = await this.llm.gerarRespostaJuridica(conteudo, historico, {
+          modo: 'workspace',
+          contextoTexto: contextoProjeto,
+        });
+      }
+    } catch (error) {
+      // Sem mock/chave: remove a mensagem do usuário para o front poder restaurar o input
+      await this.prisma.mensagem.delete({ where: { id: mensagemUsuario.id } });
+      throw error;
     }
 
     const mensagemIa = await this.prisma.mensagem.create({

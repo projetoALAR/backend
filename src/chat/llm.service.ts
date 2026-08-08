@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 const RESPOSTAS_MOCK = [
@@ -8,6 +12,9 @@ const RESPOSTAS_MOCK = [
   'Para esse cenário, um checklist de documentos e um cronograma de audiências costuma reduzir riscos.',
   'Entendi. Vamos priorizar os prazos mais próximos e alinhar as tarefas da equipe.',
 ];
+
+const ERRO_LLM =
+  'Não consegui obter resposta da IA agora. Verifique OPENAI_API_KEY, a conexão e tente novamente.';
 
 type ChatTextPart = { type: 'text'; text: string };
 type ChatImagePart = {
@@ -34,6 +41,19 @@ export class LlmService {
 
   constructor(private readonly config: ConfigService) {}
 
+  private isMockAllowed(): boolean {
+    const raw = (
+      this.config.get<string>('CHAT_ALLOW_MOCK') || ''
+    ).toLowerCase();
+    return raw === 'true' || raw === '1' || raw === 'yes';
+  }
+
+  private respostaMock(): string {
+    const texto =
+      RESPOSTAS_MOCK[Math.floor(Math.random() * RESPOSTAS_MOCK.length)];
+    return `[Modo demonstração] ${texto}`;
+  }
+
   async gerarRespostaJuridica(
     mensagemUsuario: string,
     historico: { role: 'user' | 'assistant'; content: string }[] = [],
@@ -42,10 +62,17 @@ export class LlmService {
     const opts: LlmOpcoes =
       typeof opcoes === 'string' ? { contextoTexto: opcoes } : opcoes;
 
-    const apiKey = this.config.get<string>('OPENAI_API_KEY');
+    const apiKey = this.config.get<string>('OPENAI_API_KEY')?.trim();
     if (!apiKey) {
-      this.logger.warn('OPENAI_API_KEY ausente — usando resposta mock');
-      return RESPOSTAS_MOCK[Math.floor(Math.random() * RESPOSTAS_MOCK.length)];
+      if (this.isMockAllowed()) {
+        this.logger.warn(
+          'OPENAI_API_KEY ausente — CHAT_ALLOW_MOCK ativo (resposta de demonstração)',
+        );
+        return this.respostaMock();
+      }
+      throw new ServiceUnavailableException(
+        'Chat IA indisponível: configure OPENAI_API_KEY ou defina CHAT_ALLOW_MOCK=true para respostas de demonstração.',
+      );
     }
 
     const baseUrl =
@@ -123,34 +150,21 @@ export class LlmService {
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         this.logger.error(`LLM HTTP ${response.status}: ${errText}`);
-        if (modoCaso) {
-          return (
-            'Não consegui analisar o caso agora (falha na chamada à IA). ' +
-            'Confira se a OPENAI_API_KEY está válida e se as imagens anexadas estão acessíveis. ' +
-            'Tente de novo em instantes.'
-          );
-        }
-        return RESPOSTAS_MOCK[
-          Math.floor(Math.random() * RESPOSTAS_MOCK.length)
-        ];
+        return ERRO_LLM;
       }
 
       const data = (await response.json()) as {
         choices?: { message?: { content?: string } }[];
       };
       const content = data.choices?.[0]?.message?.content?.trim();
-      return (
-        content ||
-        RESPOSTAS_MOCK[Math.floor(Math.random() * RESPOSTAS_MOCK.length)]
-      );
+      if (!content) {
+        this.logger.warn('LLM retornou conteúdo vazio');
+        return ERRO_LLM;
+      }
+      return content;
     } catch (error) {
       this.logger.error('Falha ao chamar LLM', error as Error);
-      if (modoCaso) {
-        return (
-          'Falha ao contatar o modelo de IA. Verifique a conexão e a chave OPENAI_API_KEY, depois tente novamente.'
-        );
-      }
-      return RESPOSTAS_MOCK[Math.floor(Math.random() * RESPOSTAS_MOCK.length)];
+      return ERRO_LLM;
     }
   }
 }

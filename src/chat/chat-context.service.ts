@@ -251,7 +251,9 @@ export class ChatContextService {
         const ext = this.extensao(doc.nome);
         const tipo = this.classificarArquivo(ext);
         const tamanho = doc.tamanho != null ? `${doc.tamanho} bytes` : '?';
-        const signedUrl = await this.documentos.resolveSignedUrl(doc.urlArquivo);
+        const signedUrl = await this.documentos.resolveSignedUrl(
+          doc.urlArquivo,
+        );
 
         linhas.push(
           `- [${tipo}] ${doc.nome} | ${tamanho} | enviado: ${doc.criadoEm.toISOString().slice(0, 10)} | acesso: ${signedUrl ? 'URL assinada temporária' : 'falhou'}`,
