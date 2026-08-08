@@ -2,11 +2,16 @@ import {
   Injectable,
   InternalServerErrorException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PrismaService } from '../prisma.service';
 import { Prisma } from '@prisma/client';
-import { createClient } from '@supabase/supabase-js';
+import { DocumentosService } from '../documentos/documentos.service';
 import 'multer';
+
+const BUCKET = 'documentos';
 
 type PreferenciaUpdateBody = {
   nome?: string;
@@ -19,13 +24,30 @@ type PreferenciaUpdateBody = {
 
 @Injectable()
 export class PreferenciasService {
-  private supabase;
+  private readonly logger = new Logger(PreferenciasService.name);
+  private readonly supabase: SupabaseClient;
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private documentos: DocumentosService,
+    config: ConfigService,
+  ) {
     this.supabase = createClient(
-      process.env.SUPABASE_URL || '',
-      process.env.SUPABASE_KEY || '',
+      config.get<string>('SUPABASE_URL') || '',
+      config.get<string>('SUPABASE_KEY') || '',
     );
+  }
+
+  private async withSignedFoto<T extends { fotoUrl: string | null }>(
+    preferencia: T,
+  ): Promise<T> {
+    if (!preferencia.fotoUrl) {
+      return preferencia;
+    }
+    return {
+      ...preferencia,
+      fotoUrl: await this.documentos.resolveSignedUrl(preferencia.fotoUrl),
+    };
   }
 
   async obter(userId: string) {
@@ -33,7 +55,7 @@ export class PreferenciasService {
       where: { id: userId },
     });
 
-    return this.prisma.preferencia.upsert({
+    const preferencia = await this.prisma.preferencia.upsert({
       where: { usuarioId: userId },
       create: {
         usuarioId: userId,
@@ -43,6 +65,8 @@ export class PreferenciasService {
       },
       update: {},
     });
+
+    return this.withSignedFoto(preferencia);
   }
 
   async atualizar(dados: PreferenciaUpdateBody, userId: string) {
@@ -77,9 +101,22 @@ export class PreferenciasService {
         where: { id: userId },
         data: userData,
       });
+
+      // Mantém o cartão da equipe alinhado ao perfil
+      if (dados.nome !== undefined || dados.email !== undefined) {
+        await this.prisma.membroEquipe.updateMany({
+          where: { usuarioId: userId },
+          data: {
+            ...(dados.nome !== undefined ? { nome: dados.nome } : {}),
+            ...(dados.email !== undefined
+              ? { email: dados.email.trim().toLowerCase() }
+              : {}),
+          },
+        });
+      }
     }
 
-    return preferencia;
+    return this.withSignedFoto(preferencia);
   }
 
   async atualizarFoto(arquivo: Express.Multer.File, userId: string) {
@@ -92,26 +129,24 @@ export class PreferenciasService {
       throw new BadRequestException('Formato de imagem não suportado');
     }
 
-    const nomeUnico = `avatars/${Date.now()}-${arquivo.originalname.replace(/\s+/g, '_')}`;
+    // Path no bucket privado; URL assinada só na leitura (como documentos)
+    const safeName = arquivo.originalname.replace(/[^\w.-]+/g, '_');
+    const storagePath = `avatars/${userId}/${Date.now()}-${safeName}`;
 
     const { error: uploadError } = await this.supabase.storage
-      .from('documentos')
-      .upload(nomeUnico, arquivo.buffer, {
+      .from(BUCKET)
+      .upload(storagePath, arquivo.buffer, {
         contentType: arquivo.mimetype,
         upsert: true,
       });
 
     if (uploadError) {
-      console.error(uploadError);
+      this.logger.error(uploadError.message);
       throw new InternalServerErrorException(
         'Erro ao enviar foto para a nuvem.',
       );
     }
 
-    const { data: publicUrlData } = this.supabase.storage
-      .from('documentos')
-      .getPublicUrl(nomeUnico);
-
-    return this.atualizar({ fotoUrl: publicUrlData.publicUrl }, userId);
+    return this.atualizar({ fotoUrl: storagePath }, userId);
   }
 }

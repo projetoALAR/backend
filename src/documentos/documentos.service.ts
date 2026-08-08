@@ -80,9 +80,19 @@ export class DocumentosService {
     const ext = arquivo.originalname.split('.').pop()?.toLowerCase() || '';
     const mimeOk =
       DOCUMENTO_MIME_ALLOWLIST.has(mime) ||
-      ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif', 'txt', 'csv', 'md', 'doc', 'docx'].includes(
-        ext,
-      );
+      [
+        'pdf',
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+        'gif',
+        'txt',
+        'csv',
+        'md',
+        'doc',
+        'docx',
+      ].includes(ext);
     if (!mimeOk) {
       throw new BadRequestException(
         `Tipo de arquivo não permitido (${mime || ext || 'desconhecido'}). Use PDF, imagens, TXT/CSV ou Word.`,

@@ -23,6 +23,7 @@ export class EquipeController {
     return this.equipeService.criar(dados);
   }
 
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get()
   async listarTodos() {
     return this.equipeService.listarTodos();

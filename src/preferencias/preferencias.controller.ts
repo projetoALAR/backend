@@ -10,9 +10,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PreferenciasService } from './preferencias.service';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '../auth/roles';
 import { UpdatePreferenciasDto } from '../common/common.dto';
 
 @Controller('preferencias')
+@Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
 export class PreferenciasController {
   constructor(private readonly preferenciasService: PreferenciasService) {}
 
