@@ -88,6 +88,17 @@ model Documento {
   @@index([processoId])
 }
 
+model ModeloDocumento {
+  id           String   @id @default(uuid())
+  nome         String
+  categoria    String
+  conteudo     String
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([categoria])
+}
+
 model MembroEquipe {
   id        String   @id @default(uuid())
   nome      String

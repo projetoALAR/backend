@@ -19,6 +19,8 @@ import { PreferenciasModule } from './preferencias/preferencias.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificacoesModule } from './notificacoes/notificacoes.module';
 import { AndamentosModule } from './andamentos/andamentos.module';
+import { ModelosDocumentoModule } from './modelos-documento/modelos-documento.module';
+import { PeticoesModule } from './peticoes/peticoes.module';
 import { PrismaService } from './prisma.service';
 import { RequestLoggingMiddleware } from './common/request-logging.middleware';
 
@@ -45,6 +47,8 @@ import { RequestLoggingMiddleware } from './common/request-logging.middleware';
     ChatModule,
     NotificacoesModule,
     AndamentosModule,
+    ModelosDocumentoModule,
+    PeticoesModule,
   ],
   controllers: [AppController],
   providers: [
