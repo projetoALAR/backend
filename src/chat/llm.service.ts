@@ -130,6 +130,63 @@ export class LlmService {
       messages.push({ role: 'user', content: mensagemUsuario });
     }
 
+    return this.chamarChatCompletions(apiKey, baseUrl, model, messages, {
+      temperature: modoCaso ? 0.4 : 0.35,
+    });
+  }
+
+  /**
+   * Redige textos jurídicos fictícios de demonstração (petições, sentenças, resumos).
+   * Reutilizável pela futura feature de geração de petições via IA.
+   */
+  async gerarTextoDocumento(prompt: string): Promise<string> {
+    const apiKey = this.config.get<string>('OPENAI_API_KEY')?.trim();
+    if (!apiKey) {
+      if (this.isMockAllowed()) {
+        this.logger.warn(
+          'OPENAI_API_KEY ausente — CHAT_ALLOW_MOCK ativo (texto documento demonstração)',
+        );
+        return [
+          '[CONTEÚDO FICTÍCIO GERADO PARA TESTE — não representa o processo real sob este número CNJ]',
+          '',
+          '[Modo demonstração] Texto jurídico genérico de simulação para fins de UI.',
+          'Trata-se de narrativa plausível e não de fatos reais sobre partes, valores ou decisões.',
+        ].join('\n');
+      }
+      throw new ServiceUnavailableException(
+        'Geração de documento IA indisponível: configure OPENAI_API_KEY ou defina CHAT_ALLOW_MOCK=true.',
+      );
+    }
+
+    const baseUrl =
+      this.config.get<string>('OPENAI_BASE_URL') || 'https://api.openai.com/v1';
+    const model = this.config.get<string>('OPENAI_MODEL') || 'gpt-4o-mini';
+
+    const systemPrompt = [
+      'Gere textos jurídicos PLAUSÍVEIS e GENÉRICOS para fins de demonstração de software.',
+      'Nunca afirme fatos específicos como se fossem reais.',
+      'Não invente nomes de partes reais, valores concretos ou decisões específicas de processos identificados por número CNJ.',
+      'Sempre inclua a marca de conteúdo fictício fornecida pelo usuário (no início ou no fim do texto).',
+      'Responda em português do Brasil, em prosa clara adequada a peças processuais de demonstração.',
+    ].join(' ');
+
+    const messages: ChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: prompt },
+    ];
+
+    return this.chamarChatCompletions(apiKey, baseUrl, model, messages, {
+      temperature: 0.5,
+    });
+  }
+
+  private async chamarChatCompletions(
+    apiKey: string,
+    baseUrl: string,
+    model: string,
+    messages: ChatMessage[],
+    opts: { temperature: number },
+  ): Promise<string> {
     try {
       const response = await fetch(
         `${baseUrl.replace(/\/$/, '')}/chat/completions`,
@@ -141,7 +198,7 @@ export class LlmService {
           },
           body: JSON.stringify({
             model,
-            temperature: modoCaso ? 0.4 : 0.35,
+            temperature: opts.temperature,
             messages,
           }),
         },

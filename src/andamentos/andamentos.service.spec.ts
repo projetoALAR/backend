@@ -50,12 +50,24 @@ describe('AndamentosService', () => {
     );
   });
 
-  it('listarPorProcesso retorna andamentos ordenados pelo service Prisma', async () => {
+  it('listarPorProcesso retorna andamentos com explicacao do glossário', async () => {
     prisma.processo.findUnique.mockResolvedValue({ id: 'proc-1' });
-    prisma.andamento.findMany.mockResolvedValue([{ id: 'a1' }]);
+    prisma.andamento.findMany.mockResolvedValue([
+      {
+        id: 'a1',
+        codigoMovimento: 26,
+        descricao: 'Distribuição',
+      },
+      {
+        id: 'a2',
+        codigoMovimento: 999999,
+        descricao: 'Movimento raro',
+      },
+    ]);
 
     const lista = await service.listarPorProcesso('proc-1');
-    expect(lista).toEqual([{ id: 'a1' }]);
+    expect(lista[0].explicacao).toMatch(/vara/i);
+    expect(lista[1].explicacao).toBeNull();
     expect(prisma.andamento.findMany).toHaveBeenCalledWith({
       where: { processoId: 'proc-1' },
       orderBy: { data: 'desc' },

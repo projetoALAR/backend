@@ -13,6 +13,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "seed:casos-reais": "ts-node --transpile-only prisma/seed.casos-reais.ts",
+    "seed:enriquecer-casos": "ts-node --transpile-only prisma/seed.enriquecer-casos.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -43,6 +44,7 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.19.1",
     "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
@@ -61,6 +63,7 @@
     "@types/nodemailer": "^8.0.1",
     "@types/passport-jwt": "^4.0.1",
     "@types/pdf-parse": "^1.1.5",
+    "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.20.4",
     "@types/supertest": "^7.2.1",
     "eslint": "^10.8.0",

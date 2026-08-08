@@ -8,6 +8,7 @@ import {
 } from './andamentos-provider';
 import type { AndamentosProvider } from './andamentos-provider';
 import { resolverTribunalSigla } from './datajud-tribunal.util';
+import { explicarMovimento } from './movimento-glossario.util';
 
 export type ResultadoSyncAndamentos = {
   processoId: string;
@@ -35,10 +36,15 @@ export class AndamentosService {
       throw new NotFoundException('Processo não encontrado');
     }
 
-    return this.prisma.andamento.findMany({
+    const andamentos = await this.prisma.andamento.findMany({
       where: { processoId },
       orderBy: { data: 'desc' },
     });
+
+    return andamentos.map((a) => ({
+      ...a,
+      explicacao: explicarMovimento(a.codigoMovimento, a.descricao),
+    }));
   }
 
   /**
