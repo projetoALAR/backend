@@ -5,16 +5,21 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
+import { resolveJwtSecret } from './jwt-secret';
 import { PrismaService } from '../prisma.service';
+import { DocumentosModule } from '../documentos/documentos.module';
+import { EquipeModule } from '../equipe/equipe.module';
 
 @Module({
   imports: [
+    DocumentosModule,
+    EquipeModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET') || 'alar-dev-secret-change-me',
+        secret: resolveJwtSecret(config),
         signOptions: {
           expiresIn: (config.get<string>('JWT_EXPIRES_IN') ||
             '7d') as `${number}d`,

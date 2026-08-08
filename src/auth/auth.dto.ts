@@ -45,3 +45,13 @@ export class CreateUserDto {
   @IsEnum(Role)
   role?: Role;
 }
+
+export class ChangePasswordDto {
+  @IsString()
+  @MinLength(1, { message: 'Senha atual obrigatória' })
+  senhaAtual!: string;
+
+  @IsString()
+  @MinLength(8, { message: 'A nova senha deve ter pelo menos 8 caracteres' })
+  novaSenha!: string;
+}

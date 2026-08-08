@@ -27,8 +27,11 @@ export class RolesGuard implements CanActivate {
       context.getClass(),
     ]);
 
+    // Fail-closed: rotas autenticadas devem declarar @Roles explicitamente.
     if (!requiredRoles || requiredRoles.length === 0) {
-      return true;
+      throw new ForbiddenException(
+        'Rota sem papéis configurados — acesso negado',
+      );
     }
 
     const request = context.switchToHttp().getRequest<{

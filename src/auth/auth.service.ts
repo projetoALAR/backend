@@ -12,6 +12,8 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma.service';
 import { Role } from './roles';
+import { DocumentosService } from '../documentos/documentos.service';
+import { EquipeService } from '../equipe/equipe.service';
 
 export type AuthUser = {
   id: string;
@@ -30,6 +32,8 @@ export class AuthService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly documentos: DocumentosService,
+    private readonly equipe: EquipeService,
   ) {}
 
   async onModuleInit() {
@@ -71,22 +75,31 @@ export class AuthService implements OnModuleInit {
     });
 
     this.logger.log(`Usuário admin bootstrap criado: ${email}`);
+    await this.equipe.ensureMembroForUsuario({
+      id: usuario.id,
+      nome: usuario.nome,
+      email: usuario.email,
+      role: Role.ADMIN,
+    });
   }
 
-  private toAuthUser(usuario: {
+  private async toAuthUser(usuario: {
     id: string;
     nome: string;
     email: string;
     role: Role;
     fotoUrl: string | null;
     criadoEm: Date;
-  }): AuthUser {
+  }): Promise<AuthUser> {
+    const fotoUrl = usuario.fotoUrl
+      ? await this.documentos.resolveSignedUrl(usuario.fotoUrl)
+      : null;
     return {
       id: usuario.id,
       nome: usuario.nome,
       email: usuario.email,
       role: usuario.role,
-      fotoUrl: usuario.fotoUrl,
+      fotoUrl,
       criadoEm: usuario.criadoEm,
     };
   }
@@ -181,7 +194,14 @@ export class AuthService implements OnModuleInit {
       },
     });
 
-    return this.toAuthUser(usuario);
+    const authUser = await this.toAuthUser(usuario);
+    await this.equipe.ensureMembroForUsuario({
+      id: authUser.id,
+      nome: authUser.nome,
+      email: authUser.email,
+      role: authUser.role,
+    });
+    return authUser;
   }
 
   async login(dados: { email: string; senha: string }) {
@@ -199,7 +219,7 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    const user = this.toAuthUser(usuario);
+    const user = await this.toAuthUser(usuario);
     return {
       access_token: this.signToken(user),
       user,
@@ -216,6 +236,37 @@ export class AuthService implements OnModuleInit {
     return this.toAuthUser(usuario);
   }
 
+  async changePassword(userId: string, senhaAtual: string, novaSenha: string) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+    });
+    if (!usuario) {
+      throw new UnauthorizedException('Usuário não encontrado');
+    }
+
+    const ok = await bcrypt.compare(senhaAtual, usuario.senhaHash);
+    if (!ok) {
+      throw new BadRequestException('Senha atual incorreta');
+    }
+
+    if (senhaAtual === novaSenha) {
+      throw new BadRequestException('A nova senha deve ser diferente da atual');
+    }
+
+    if (!novaSenha || novaSenha.length < 8) {
+      throw new BadRequestException(
+        'A nova senha deve ter pelo menos 8 caracteres',
+      );
+    }
+
+    await this.prisma.usuario.update({
+      where: { id: userId },
+      data: { senhaHash: await bcrypt.hash(novaSenha, 10) },
+    });
+
+    return { ok: true };
+  }
+
   async listUsers() {
     const usuarios = await this.prisma.usuario.findMany({
       orderBy: { criadoEm: 'desc' },
@@ -228,6 +279,13 @@ export class AuthService implements OnModuleInit {
         criadoEm: true,
       },
     });
-    return usuarios;
+    return Promise.all(
+      usuarios.map(async (u) => ({
+        ...u,
+        fotoUrl: u.fotoUrl
+          ? await this.documentos.resolveSignedUrl(u.fotoUrl)
+          : null,
+      })),
+    );
   }
 }

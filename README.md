@@ -49,17 +49,22 @@ Variáveis de ambiente do backend (veja também `.env.example`):
 | `ADVOGADO` | CRUD de clientes/processos/documentos; leitura de equipe |
 | `ASSISTENTE` | Leitura geral; upload de documentos e compromissos; sem exclusão crítica |
 
+**Equipe ↔ usuário:** `MembroEquipe.usuarioId` liga o cartão da equipe à conta de login. Criar usuário (admin/register) cria/atualiza o membro; criar membro com e-mail novo exige senha e cria o `Usuario`. Remover da equipe não apaga a conta.
+
 No primeiro start, se a tabela `Usuario` estiver vazia **e** `AUTH_ADMIN_PASSWORD` estiver definida, o admin é criado com papel `ADMIN`.
 
 Endpoints públicos: `POST /auth/login`, `POST /auth/register` (se liberado), `GET /`. Demais rotas exigem `Authorization: Bearer <token>`.
+
+Troca de senha: `POST /auth/change-password` com `{ senhaAtual, novaSenha }` (autenticado). Logout: `POST /auth/logout` (contrato; o JWT é stateless — o frontend limpa o cookie httpOnly).
 
 Rate limit: login (10/min) e register (5/min). Helmet e CORS configuráveis estão ativos.
 
 ### Chat IA (OpenAI-compatible)
 
-- `OPENAI_API_KEY` — chave da API (sem ela, usa respostas mock)
+- `OPENAI_API_KEY` — chave da API (obrigatória em uso real)
 - `OPENAI_BASE_URL` — opcional (padrão `https://api.openai.com/v1`; use Groq/outro compatível)
 - `OPENAI_MODEL` — opcional (padrão `gpt-4o-mini`)
+- `CHAT_ALLOW_MOCK` — `true` libera respostas de demonstração com prefixo `[Modo demonstração]` quando não há chave; padrão: desligado (API retorna 503)
 
 ### E-mail (SMTP)
 
