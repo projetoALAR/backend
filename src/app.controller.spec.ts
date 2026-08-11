@@ -53,4 +53,13 @@ describe('AppController', () => {
       );
     });
   });
+
+  describe('debugSentry', () => {
+    it('should 404 when test endpoint is disabled', () => {
+      const prev = process.env.SENTRY_ENABLE_TEST_ENDPOINT;
+      process.env.SENTRY_ENABLE_TEST_ENDPOINT = 'false';
+      expect(() => appController.debugSentry()).toThrow();
+      process.env.SENTRY_ENABLE_TEST_ENDPOINT = prev;
+    });
+  });
 });

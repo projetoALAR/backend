@@ -1,4 +1,10 @@
-import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { AppService } from './app.service';
 import { Public } from './auth/public.decorator';
 import { PrismaService } from './prisma.service';
@@ -26,6 +32,7 @@ export class AppController {
         service: 'alar-api',
         database: 'up',
         timestamp: new Date().toISOString(),
+        sentry: Boolean(process.env.SENTRY_DSN?.trim()),
       };
     } catch {
       throw new ServiceUnavailableException({
@@ -33,7 +40,26 @@ export class AppController {
         service: 'alar-api',
         database: 'down',
         timestamp: new Date().toISOString(),
+        sentry: Boolean(process.env.SENTRY_DSN?.trim()),
       });
     }
+  }
+
+  /**
+   * Dispara erro de teste no Sentry.
+   * Só ativo com SENTRY_ENABLE_TEST_ENDPOINT=true (bloqueado em production).
+   */
+  @Public()
+  @Get('debug/sentry')
+  debugSentry() {
+    if (process.env.SENTRY_ENABLE_TEST_ENDPOINT !== 'true') {
+      throw new NotFoundException();
+    }
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException();
+    }
+    const err = new Error('Alar API — erro de teste do Sentry');
+    Sentry.captureException(err);
+    throw err;
   }
 }
