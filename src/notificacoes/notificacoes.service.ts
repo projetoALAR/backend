@@ -108,18 +108,77 @@ export class NotificacoesService {
       select: { id: true },
     });
     for (const u of usuarios) {
-      const prefs = await this.prefsDoUsuario(u.id);
-      if (prefs[flag] === false) continue;
-      await this.criarInbox({
-        usuarioId: u.id,
-        titulo: assunto,
-        corpo: texto,
-        tipo: tipo || flag,
-        link,
-      });
-      if (prefs.email !== false) {
-        await this.enviarEmailSeAtivo(u.id, assunto, texto);
-      }
+      await this.notificarUsuario(u.id, assunto, texto, link, flag, tipo);
     }
+  }
+
+  async notificarUsuario(
+    usuarioId: string,
+    assunto: string,
+    texto: string,
+    link?: string,
+    flag: keyof NotificacoesPrefs = 'reminders',
+    tipo?: string,
+  ) {
+    const prefs = await this.prefsDoUsuario(usuarioId);
+    if (prefs[flag] === false) return;
+
+    await this.criarInbox({
+      usuarioId,
+      titulo: assunto,
+      corpo: texto,
+      tipo: tipo || flag,
+      link,
+    });
+
+    if (prefs.email !== false) {
+      await this.enviarEmailSeAtivo(usuarioId, assunto, texto);
+    }
+  }
+
+  /** Evita duplicar lembrete no mesmo dia. */
+  async notificarComDedup(dados: {
+    usuarioId: string;
+    titulo: string;
+    corpo: string;
+    link?: string;
+    tipo?: string;
+    flag?: keyof NotificacoesPrefs;
+  }): Promise<boolean> {
+    const prefs = await this.prefsDoUsuario(dados.usuarioId);
+    const flag = dados.flag ?? 'reminders';
+    if (prefs[flag] === false) return false;
+
+    const inicio = new Date();
+    inicio.setHours(0, 0, 0, 0);
+
+    const existente = await this.prisma.inboxItem.findFirst({
+      where: {
+        usuarioId: dados.usuarioId,
+        titulo: dados.titulo,
+        tipo: dados.tipo || 'prazo-lembrete',
+        criadoEm: { gte: inicio },
+      },
+      select: { id: true },
+    });
+    if (existente) return false;
+
+    await this.criarInbox({
+      usuarioId: dados.usuarioId,
+      titulo: dados.titulo,
+      corpo: dados.corpo,
+      tipo: dados.tipo || 'prazo-lembrete',
+      link: dados.link,
+    });
+
+    if (prefs.email !== false) {
+      await this.enviarEmailSeAtivo(
+        dados.usuarioId,
+        dados.titulo,
+        dados.corpo,
+      );
+    }
+
+    return true;
   }
 }
