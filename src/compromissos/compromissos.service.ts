@@ -1,16 +1,28 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
 import { CreateCompromissoDto, UpdateCompromissoDto } from './compromissos.dto';
+import {
+  CasoAcessoService,
+  type CasoAcessoUser,
+} from '../casos-acesso/caso-acesso.service';
 
 @Injectable()
 export class CompromissosService {
   constructor(
     private prisma: PrismaService,
     private notificacoes: NotificacoesService,
+    private casoAcesso: CasoAcessoService,
   ) {}
 
-  async criar(dados: CreateCompromissoDto) {
+  async criar(dados: CreateCompromissoDto, user: CasoAcessoUser) {
+    if (dados.processoId) {
+      await this.casoAcesso.assertPodeVer(user, dados.processoId);
+    } else if (this.casoAcesso.precisaFiltrar(user)) {
+      throw new ForbiddenException(
+        'Assistente só pode criar compromisso vinculado a um caso atribuído',
+      );
+    }
     const compromisso = await this.prisma.compromisso.create({
       data: {
         titulo: dados.titulo.trim(),
@@ -31,8 +43,9 @@ export class CompromissosService {
     return compromisso;
   }
 
-  async listarTodos() {
+  async listarTodos(user: CasoAcessoUser) {
     return this.prisma.compromisso.findMany({
+      where: this.casoAcesso.visibilidadeCompromisso(user),
       orderBy: { dataHora: 'asc' },
       include: {
         processo: {
@@ -42,7 +55,14 @@ export class CompromissosService {
     });
   }
 
-  async atualizar(id: string, dados: UpdateCompromissoDto) {
+  async atualizar(id: string, dados: UpdateCompromissoDto, user: CasoAcessoUser) {
+    const atual = await this.prisma.compromisso.findUnique({ where: { id } });
+    if (atual?.processoId) {
+      await this.casoAcesso.assertPodeVer(user, atual.processoId);
+    }
+    if (dados.processoId) {
+      await this.casoAcesso.assertPodeVer(user, dados.processoId);
+    }
     return this.prisma.compromisso.update({
       where: { id },
       data: {

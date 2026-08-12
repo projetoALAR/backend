@@ -22,6 +22,7 @@ import { AndamentosModule } from './andamentos/andamentos.module';
 import { ModelosDocumentoModule } from './modelos-documento/modelos-documento.module';
 import { PeticoesModule } from './peticoes/peticoes.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
+import { CasoAcessoModule } from './casos-acesso/caso-acesso.module';
 import { PrismaService } from './prisma.service';
 import { RequestLoggingMiddleware } from './common/request-logging.middleware';
 
@@ -51,6 +52,7 @@ import { RequestLoggingMiddleware } from './common/request-logging.middleware';
     ModelosDocumentoModule,
     PeticoesModule,
     AuditoriaModule,
+    CasoAcessoModule,
   ],
   controllers: [AppController],
   providers: [

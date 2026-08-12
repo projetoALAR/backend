@@ -15,6 +15,7 @@ import { CreateProcessoDto, UpdateProcessoDto } from './processos.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
+import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
 
 @Controller('processos')
 export class ProcessosController {
@@ -29,7 +30,7 @@ export class ProcessosController {
     @Body() dados: CreateProcessoDto,
     @CurrentUser() ator: AuditActor,
   ) {
-    const processo = await this.processosService.criar(dados);
+    const processo = await this.processosService.criar(dados, ator?.id);
     await this.auditoria.registrar({
       acao: 'CRIAR',
       entidade: 'PROCESSO',
@@ -42,14 +43,17 @@ export class ProcessosController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get('cliente/:clienteId')
-  async listarPorCliente(@Param('clienteId', ParseUUIDPipe) clienteId: string) {
-    return this.processosService.listarPorCliente(clienteId);
+  async listarPorCliente(
+    @Param('clienteId', ParseUUIDPipe) clienteId: string,
+    @CurrentUser() user: CasoAcessoUser,
+  ) {
+    return this.processosService.listarPorCliente(clienteId, user);
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get()
-  async listarTodos() {
-    return this.processosService.listarTodos();
+  async listarTodos(@CurrentUser() user: CasoAcessoUser) {
+    return this.processosService.listarTodos(user);
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)

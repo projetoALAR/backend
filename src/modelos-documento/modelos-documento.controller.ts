@@ -16,10 +16,16 @@ import {
   UpdateModeloDocumentoDto,
 } from './modelos-documento.dto';
 import { ModelosDocumentoService } from './modelos-documento.service';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { CasoAcessoService } from '../casos-acesso/caso-acesso.service';
+import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
 
 @Controller('modelos-documento')
 export class ModelosDocumentoController {
-  constructor(private readonly service: ModelosDocumentoService) {}
+  constructor(
+    private readonly service: ModelosDocumentoService,
+    private readonly casoAcesso: CasoAcessoService,
+  ) {}
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Post()
@@ -35,10 +41,12 @@ export class ModelosDocumentoController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get(':id/preview/:processoId')
-  preview(
+  async preview(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('processoId', ParseUUIDPipe) processoId: string,
+    @CurrentUser() user: CasoAcessoUser,
   ) {
+    await this.casoAcesso.assertPodeVer(user, processoId);
     return this.service.previsualizar(id, processoId);
   }
 

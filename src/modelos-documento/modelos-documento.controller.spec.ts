@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ModelosDocumentoController } from './modelos-documento.controller';
 import { ModelosDocumentoService } from './modelos-documento.service';
+import { CasoAcessoService } from '../casos-acesso/caso-acesso.service';
+import { Role } from '../auth/roles';
 
 describe('ModelosDocumentoController', () => {
   let controller: ModelosDocumentoController;
@@ -17,7 +19,10 @@ describe('ModelosDocumentoController', () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ModelosDocumentoController],
-      providers: [{ provide: ModelosDocumentoService, useValue: service }],
+      providers: [
+        { provide: ModelosDocumentoService, useValue: service },
+        { provide: CasoAcessoService, useValue: { assertPodeVer: jest.fn() } },
+      ],
     }).compile();
 
     controller = module.get(ModelosDocumentoController);
@@ -46,7 +51,9 @@ describe('ModelosDocumentoController', () => {
 
   it('preview delega previsualizar', async () => {
     service.previsualizar.mockResolvedValue({ texto: 'ok' });
-    await expect(controller.preview('m1', 'p1')).resolves.toEqual({
+    await expect(
+      controller.preview('m1', 'p1', { id: 'u1', role: Role.ADMIN }),
+    ).resolves.toEqual({
       texto: 'ok',
     });
     expect(service.previsualizar).toHaveBeenCalledWith('m1', 'p1');

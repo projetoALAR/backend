@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentosController } from './documentos.controller';
 import { DocumentosService } from './documentos.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { CasoAcessoService } from '../casos-acesso/caso-acesso.service';
 
 describe('DocumentosController', () => {
   let controller: DocumentosController;
@@ -21,6 +22,10 @@ describe('DocumentosController', () => {
         {
           provide: AuditoriaService,
           useValue: { registrar: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: CasoAcessoService,
+          useValue: { assertPodeVer: jest.fn() },
         },
       ],
     }).compile();

@@ -68,6 +68,14 @@ export class CreateProcessoDto {
   @IsOptional()
   @IsBoolean()
   concluido?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  responsavelId?: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  coResponsavelId?: string | null;
 }
 
 export class UpdateProcessoDto {
@@ -114,4 +122,12 @@ export class UpdateProcessoDto {
   @IsOptional()
   @IsBoolean()
   concluido?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  responsavelId?: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  coResponsavelId?: string | null;
 }

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DashboardService } from './dashboard.service';
 import { PrismaService } from '../prisma.service';
+import { CasoAcessoService } from '../casos-acesso/caso-acesso.service';
 
 describe('DashboardService', () => {
   let service: DashboardService;
@@ -16,6 +17,14 @@ describe('DashboardService', () => {
             processo: { count: jest.fn(), findMany: jest.fn() },
             compromisso: { count: jest.fn(), findMany: jest.fn() },
             membroEquipe: { count: jest.fn() },
+          },
+        },
+        {
+          provide: CasoAcessoService,
+          useValue: {
+            visibilidadeProcesso: jest.fn().mockReturnValue({}),
+            visibilidadeCliente: jest.fn().mockReturnValue({}),
+            visibilidadeCompromisso: jest.fn().mockReturnValue({}),
           },
         },
       ],

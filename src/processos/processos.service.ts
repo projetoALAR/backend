@@ -1,16 +1,45 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
 import { CreateProcessoDto, UpdateProcessoDto } from './processos.dto';
+import {
+  CasoAcessoService,
+  type CasoAcessoUser,
+} from '../casos-acesso/caso-acesso.service';
+
+const usuarioResumo = {
+  select: { id: true, nome: true, email: true, role: true },
+} as const;
+
+const processoInclude = {
+  cliente: {
+    select: {
+      id: true,
+      nome: true,
+      email: true,
+      telefone: true,
+      cpf: true,
+    },
+  },
+  responsavel: usuarioResumo,
+  coResponsavel: usuarioResumo,
+} satisfies Prisma.ProcessoInclude;
 
 @Injectable()
 export class ProcessosService {
   constructor(
     private prisma: PrismaService,
     private notificacoes: NotificacoesService,
+    private casoAcesso: CasoAcessoService,
   ) {}
 
-  async criar(dados: CreateProcessoDto) {
+  async criar(dados: CreateProcessoDto, atorId?: string) {
+    const { responsavelId, coResponsavelId } = await this.resolverEquipe(
+      dados.responsavelId !== undefined ? dados.responsavelId : atorId ?? null,
+      dados.coResponsavelId ?? null,
+    );
+
     const processo = await this.prisma.processo.create({
       data: {
         numero: dados.numero.trim(),
@@ -22,18 +51,10 @@ export class ProcessosService {
         prazo: dados.prazo ? new Date(dados.prazo) : null,
         tags: dados.tags ?? undefined,
         concluido: dados.concluido ?? false,
+        responsavelId,
+        coResponsavelId,
       },
-      include: {
-        cliente: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            telefone: true,
-            cpf: true,
-          },
-        },
-      },
+      include: processoInclude,
     });
 
     if (processo.prazo) {
@@ -49,36 +70,22 @@ export class ProcessosService {
     return processo;
   }
 
-  async listarPorCliente(clienteId: string) {
+  async listarPorCliente(clienteId: string, user: CasoAcessoUser) {
     return this.prisma.processo.findMany({
-      where: { clienteId },
-      include: {
-        cliente: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            telefone: true,
-            cpf: true,
-          },
-        },
+      where: {
+        clienteId,
+        ...this.casoAcesso.visibilidadeProcesso(user),
       },
+      include: processoInclude,
       orderBy: { criadoEm: 'desc' },
     });
   }
 
-  async listarTodos() {
+  async listarTodos(user: CasoAcessoUser) {
     return this.prisma.processo.findMany({
+      where: this.casoAcesso.visibilidadeProcesso(user),
       include: {
-        cliente: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            telefone: true,
-            cpf: true,
-          },
-        },
+        ...processoInclude,
         _count: { select: { documentos: true, compromissos: true } },
       },
       orderBy: { criadoEm: 'desc' },
@@ -89,13 +96,17 @@ export class ProcessosService {
     const numeroNovo =
       dados.numero !== undefined ? dados.numero.trim() : undefined;
 
+    const equipe =
+      dados.responsavelId !== undefined || dados.coResponsavelId !== undefined
+        ? await this.equipeParaUpdate(id, dados)
+        : {};
+
     return this.prisma.processo.update({
       where: { id },
       data: {
         ...(numeroNovo !== undefined
           ? {
               numero: numeroNovo,
-              // Recalcula o índice DataJud na próxima sincronização
               tribunalSigla: null,
             }
           : {}),
@@ -117,18 +128,9 @@ export class ProcessosService {
         ...(dados.concluido !== undefined
           ? { concluido: dados.concluido }
           : {}),
+        ...equipe,
       },
-      include: {
-        cliente: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            telefone: true,
-            cpf: true,
-          },
-        },
-      },
+      include: processoInclude,
     });
   }
 
@@ -136,5 +138,46 @@ export class ProcessosService {
     return this.prisma.processo.delete({
       where: { id },
     });
+  }
+
+  private async equipeParaUpdate(id: string, dados: UpdateProcessoDto) {
+    const atual = await this.prisma.processo.findUnique({
+      where: { id },
+      select: { responsavelId: true, coResponsavelId: true },
+    });
+    const responsavelId =
+      dados.responsavelId !== undefined
+        ? dados.responsavelId
+        : (atual?.responsavelId ?? null);
+    const coResponsavelId =
+      dados.coResponsavelId !== undefined
+        ? dados.coResponsavelId
+        : (atual?.coResponsavelId ?? null);
+    return this.resolverEquipe(responsavelId, coResponsavelId);
+  }
+
+  private async resolverEquipe(
+    responsavelId: string | null,
+    coResponsavelId: string | null,
+  ) {
+    if (responsavelId && coResponsavelId && responsavelId === coResponsavelId) {
+      throw new BadRequestException(
+        'Responsável e co-responsável devem ser pessoas diferentes',
+      );
+    }
+    await this.assertUsuario(responsavelId);
+    await this.assertUsuario(coResponsavelId);
+    return { responsavelId, coResponsavelId };
+  }
+
+  private async assertUsuario(id: string | null) {
+    if (!id) return;
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!usuario) {
+      throw new BadRequestException('Usuário da equipe não encontrado');
+    }
   }
 }

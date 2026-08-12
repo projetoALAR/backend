@@ -12,6 +12,8 @@ import { CompromissosService } from './compromissos.service';
 import { CreateCompromissoDto, UpdateCompromissoDto } from './compromissos.dto';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
 
 @Controller('compromissos')
 export class CompromissosController {
@@ -19,14 +21,17 @@ export class CompromissosController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Post()
-  async criar(@Body() dados: CreateCompromissoDto) {
-    return this.compromissosService.criar(dados);
+  async criar(
+    @Body() dados: CreateCompromissoDto,
+    @CurrentUser() user: CasoAcessoUser,
+  ) {
+    return this.compromissosService.criar(dados, user);
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get()
-  async listarTodos() {
-    return this.compromissosService.listarTodos();
+  async listarTodos(@CurrentUser() user: CasoAcessoUser) {
+    return this.compromissosService.listarTodos(user);
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
@@ -34,8 +39,9 @@ export class CompromissosController {
   async atualizar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dados: UpdateCompromissoDto,
+    @CurrentUser() user: CasoAcessoUser,
   ) {
-    return this.compromissosService.atualizar(id, dados);
+    return this.compromissosService.atualizar(id, dados, user);
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)

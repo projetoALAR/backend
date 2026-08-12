@@ -1,12 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import {
+  CasoAcessoService,
+  type CasoAcessoUser,
+} from '../casos-acesso/caso-acesso.service';
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private casoAcesso: CasoAcessoService,
+  ) {}
 
-  async obterResumo() {
+  async obterResumo(user: CasoAcessoUser) {
     const agora = new Date();
+    const whereProcesso = this.casoAcesso.visibilidadeProcesso(user);
+    const whereCliente = this.casoAcesso.visibilidadeCliente(user);
+    const whereCompromisso = this.casoAcesso.visibilidadeCompromisso(user);
 
     const [
       totalClientes,
@@ -19,15 +29,21 @@ export class DashboardService {
       processosComPrazo,
       totalMembros,
     ] = await Promise.all([
-      this.prisma.cliente.count(),
-      this.prisma.processo.count(),
-      this.prisma.processo.count({ where: { concluido: true } }),
-      this.prisma.processo.count({ where: { concluido: false } }),
+      this.prisma.cliente.count({ where: whereCliente }),
+      this.prisma.processo.count({ where: whereProcesso }),
+      this.prisma.processo.count({
+        where: { ...whereProcesso, concluido: true },
+      }),
+      this.prisma.processo.count({
+        where: { ...whereProcesso, concluido: false },
+      }),
       this.prisma.processo.groupBy({
         by: ['status'],
+        where: whereProcesso,
         _count: { status: true },
       }),
       this.prisma.processo.findMany({
+        where: whereProcesso,
         take: 5,
         orderBy: { atualizadoEm: 'desc' },
         include: {
@@ -35,7 +51,7 @@ export class DashboardService {
         },
       }),
       this.prisma.compromisso.findMany({
-        where: { dataHora: { gte: agora } },
+        where: { ...whereCompromisso, dataHora: { gte: agora } },
         take: 5,
         orderBy: { dataHora: 'asc' },
         include: {
@@ -44,6 +60,7 @@ export class DashboardService {
       }),
       this.prisma.processo.findMany({
         where: {
+          ...whereProcesso,
           concluido: false,
           prazo: { not: null, gte: agora },
         },

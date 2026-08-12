@@ -6,6 +6,10 @@ import {
 import { PrismaService } from '../prisma.service';
 import { DocumentosService } from '../documentos/documentos.service';
 import { CreateClienteDto, UpdateClienteDto } from './clientes.dto';
+import {
+  CasoAcessoService,
+  type CasoAcessoUser,
+} from '../casos-acesso/caso-acesso.service';
 
 export const NOME_TITULAR_ANONIMIZADO = 'Titular anonimizado';
 
@@ -14,6 +18,7 @@ export class ClientesService {
   constructor(
     private prisma: PrismaService,
     private documentos: DocumentosService,
+    private casoAcesso: CasoAcessoService,
   ) {}
 
   async criar(dados: CreateClienteDto) {
@@ -27,8 +32,9 @@ export class ClientesService {
     });
   }
 
-  async listarTodos() {
+  async listarTodos(user: CasoAcessoUser) {
     return this.prisma.cliente.findMany({
+      where: this.casoAcesso.visibilidadeCliente(user),
       include: {
         _count: { select: { processos: true } },
       },

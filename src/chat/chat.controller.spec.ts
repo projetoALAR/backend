@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
+import { CasoAcessoService } from '../casos-acesso/caso-acesso.service';
+import { Role } from '../auth/roles';
 
 describe('ChatController', () => {
   let controller: ChatController;
@@ -17,7 +19,10 @@ describe('ChatController', () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ChatController],
-      providers: [{ provide: ChatService, useValue: chatService }],
+      providers: [
+        { provide: ChatService, useValue: chatService },
+        { provide: CasoAcessoService, useValue: { assertPodeVer: jest.fn() } },
+      ],
     }).compile();
     controller = module.get(ChatController);
   });
@@ -42,7 +47,7 @@ describe('ChatController', () => {
   it('porProcesso obtém ou cria conversa', async () => {
     chatService.obterOuCriarPorProcesso.mockResolvedValue({ id: 'c2' });
     await expect(
-      controller.porProcesso({ id: 'u1' }, 'proc-1'),
+      controller.porProcesso({ id: 'u1', role: Role.ADMIN }, 'proc-1'),
     ).resolves.toEqual({ id: 'c2' });
     expect(chatService.obterOuCriarPorProcesso).toHaveBeenCalledWith(
       'proc-1',

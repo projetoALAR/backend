@@ -13,13 +13,18 @@ import { CreateConversaDto, EnviarMensagemDto } from '../common/common.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
+import { CasoAcessoService } from '../casos-acesso/caso-acesso.service';
+import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
 
-type AuthUser = { id: string };
+type AuthUser = CasoAcessoUser;
 
 @Controller('chat')
 @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly casoAcesso: CasoAcessoService,
+  ) {}
 
   @Get('conversas')
   async listarConversas(@CurrentUser() user: AuthUser) {
@@ -39,6 +44,7 @@ export class ChatController {
     @CurrentUser() user: AuthUser,
     @Param('processoId', ParseUUIDPipe) processoId: string,
   ) {
+    await this.casoAcesso.assertPodeVer(user, processoId);
     return this.chatService.obterOuCriarPorProcesso(processoId, user.id);
   }
 

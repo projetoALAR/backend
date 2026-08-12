@@ -17,6 +17,8 @@ import { UploadDocumentoDto } from './documentos.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
+import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
+import { CasoAcessoService } from '../casos-acesso/caso-acesso.service';
 import 'multer';
 
 @Controller('documentos')
@@ -24,6 +26,7 @@ export class DocumentosController {
   constructor(
     private readonly documentosService: DocumentosService,
     private readonly auditoria: AuditoriaService,
+    private readonly casoAcesso: CasoAcessoService,
   ) {}
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
@@ -32,8 +35,9 @@ export class DocumentosController {
   async upload(
     @UploadedFile() arquivo: Express.Multer.File,
     @Body() body: UploadDocumentoDto,
-    @CurrentUser() ator: AuditActor,
+    @CurrentUser() ator: AuditActor & CasoAcessoUser,
   ) {
+    await this.casoAcesso.assertPodeVer(ator, body.processoId);
     const doc = await this.documentosService.fazerUpload(
       body.processoId,
       arquivo,
@@ -52,7 +56,9 @@ export class DocumentosController {
   @Get('processo/:processoId')
   async listarPorProcesso(
     @Param('processoId', ParseUUIDPipe) processoId: string,
+    @CurrentUser() user: CasoAcessoUser,
   ) {
+    await this.casoAcesso.assertPodeVer(user, processoId);
     return this.documentosService.listarPorProcesso(processoId);
   }
 

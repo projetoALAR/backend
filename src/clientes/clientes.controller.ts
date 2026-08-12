@@ -15,6 +15,7 @@ import { CreateClienteDto, UpdateClienteDto } from './clientes.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
+import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
 
 @Controller('clientes')
 export class ClientesController {
@@ -42,8 +43,8 @@ export class ClientesController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get()
-  async listarTodos() {
-    return this.clientesService.listarTodos();
+  async listarTodos(@CurrentUser() user: CasoAcessoUser) {
+    return this.clientesService.listarTodos(user);
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)

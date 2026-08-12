@@ -35,6 +35,11 @@ model Processo {
   clienteId String
   cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 
+  responsavelId   String?
+  responsavel     Usuario? @relation("ProcessoResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  coResponsavelId String?
+  coResponsavel   Usuario? @relation("ProcessoCoResponsavel", fields: [coResponsavelId], references: [id], onDelete: SetNull)
+
   compromissos Compromisso[]
   documentos   Documento[]
   conversas    Conversacao[]
@@ -45,6 +50,8 @@ model Processo {
   @@index([prazo])
   @@index([status])
   @@index([atualizadoEm])
+  @@index([responsavelId])
+  @@index([coResponsavelId])
 }
 
 model Andamento {
@@ -137,6 +144,8 @@ model Usuario {
   contatos     ContatoLog[]
   conversacoes Conversacao[]
   membroEquipe MembroEquipe?
+  processosComoResponsavel   Processo[] @relation("ProcessoResponsavel")
+  processosComoCoResponsavel Processo[] @relation("ProcessoCoResponsavel")
 }
 
 model Preferencia {

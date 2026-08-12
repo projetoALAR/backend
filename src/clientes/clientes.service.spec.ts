@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ClientesService } from './clientes.service';
 import { PrismaService } from '../prisma.service';
 import { DocumentosService } from '../documentos/documentos.service';
+import { CasoAcessoService } from '../casos-acesso/caso-acesso.service';
 
 describe('ClientesService', () => {
   const prisma = {
@@ -23,6 +24,7 @@ describe('ClientesService', () => {
     service = new ClientesService(
       prisma as unknown as PrismaService,
       documentos as unknown as DocumentosService,
+      { visibilidadeCliente: jest.fn().mockReturnValue({}) } as unknown as CasoAcessoService,
     );
   });
 
