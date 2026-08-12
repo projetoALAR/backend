@@ -17,6 +17,8 @@ describe('ClientesController', () => {
             listarTodos: jest.fn(),
             atualizar: jest.fn(),
             remover: jest.fn(),
+            exportar: jest.fn(),
+            anonimizar: jest.fn(),
           },
         },
         {

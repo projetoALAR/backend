@@ -47,6 +47,40 @@ export class ClientesController {
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
+  @Get(':id/export')
+  async exportar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() ator: AuditActor,
+  ) {
+    const payload = await this.clientesService.exportar(id);
+    await this.auditoria.registrar({
+      acao: 'EDITAR',
+      entidade: 'CLIENTE',
+      entidadeId: id,
+      resumo: `Exportação LGPD — ${payload.cliente.nome}`,
+      ator,
+    });
+    return payload;
+  }
+
+  @Roles(Role.ADMIN)
+  @Post(':id/anonimizar')
+  async anonimizar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() ator: AuditActor,
+  ) {
+    const cliente = await this.clientesService.anonimizar(id);
+    await this.auditoria.registrar({
+      acao: 'EDITAR',
+      entidade: 'CLIENTE',
+      entidadeId: cliente.id,
+      resumo: `Anonimização LGPD — ${cliente.nome}`,
+      ator,
+    });
+    return cliente;
+  }
+
+  @Roles(Role.ADMIN, Role.ADVOGADO)
   @Put(':id')
   async atualizar(
     @Param('id', ParseUUIDPipe) id: string,
