@@ -2,12 +2,40 @@ name: CI
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master, develop, "feat/**"]
   pull_request:
 
 jobs:
   quality:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: alar
+          POSTGRES_PASSWORD: alar
+          POSTGRES_DB: alar_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U alar -d alar_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://alar:alar@localhost:5432/alar_ci
+      DIRECT_URL: postgresql://alar:alar@localhost:5432/alar_ci
+      JWT_SECRET: ci-test-secret-min-32-characters-long
+      AUTH_ADMIN_EMAIL: admin@alar.com.br
+      AUTH_ADMIN_PASSWORD: AlarAdminChangeMe1
+      AUTH_ADMIN_NOME: Administrador CI
+      AUTH_ALLOW_PUBLIC_REGISTER: "false"
+      CHAT_ALLOW_MOCK: "true"
+      SWAGGER_ENABLED: "false"
+      CORS_ORIGINS: http://localhost:3000
+
     steps:
       - uses: actions/checkout@v4
 
@@ -21,9 +49,6 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
-        env:
-          DIRECT_URL: postgresql://user:pass@localhost:5432/db
-          DATABASE_URL: postgresql://user:pass@localhost:5432/db
 
       - name: Lint
         run: npm run lint
@@ -33,5 +58,9 @@ jobs:
 
       - name: Unit tests
         run: npm test -- --passWithNoTests
-        env:
-          JWT_SECRET: test-secret
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: E2E critical flow
+        run: npm run test:e2e
