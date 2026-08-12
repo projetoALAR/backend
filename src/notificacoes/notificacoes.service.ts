@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { PrismaService } from '../prisma.service';
+import { montarEmailAlar } from './email-template';
 
 type NotificacoesPrefs = {
   email?: boolean;
@@ -61,7 +62,20 @@ export class NotificacoesService {
     });
   }
 
-  async enviarEmailSeAtivo(usuarioId: string, assunto: string, texto: string) {
+  private appUrl(): string {
+    return (
+      this.config.get<string>('APP_URL') ||
+      this.config.get<string>('CORS_ORIGINS')?.split(',')[0]?.trim() ||
+      'http://localhost:3000'
+    );
+  }
+
+  async enviarEmailSeAtivo(
+    usuarioId: string,
+    assunto: string,
+    texto: string,
+    link?: string,
+  ) {
     const prefs = await this.prefsDoUsuario(usuarioId);
     if (prefs.email === false) {
       return { skipped: true };
@@ -82,12 +96,20 @@ export class NotificacoesService {
       this.config.get<string>('SMTP_USER') ||
       'noreply@alar.local';
 
+    const { html, text } = montarEmailAlar({
+      titulo: assunto,
+      corpo: texto,
+      link,
+      appUrl: this.appUrl(),
+    });
+
     try {
       await this.transporter.sendMail({
         from,
         to,
-        subject: assunto,
-        text: texto,
+        subject: `[Alar] ${assunto}`,
+        text,
+        html,
       });
       return { sent: true };
     } catch (error) {
@@ -132,7 +154,7 @@ export class NotificacoesService {
     });
 
     if (prefs.email !== false) {
-      await this.enviarEmailSeAtivo(usuarioId, assunto, texto);
+      await this.enviarEmailSeAtivo(usuarioId, assunto, texto, link);
     }
   }
 
@@ -176,6 +198,7 @@ export class NotificacoesService {
         dados.usuarioId,
         dados.titulo,
         dados.corpo,
+        dados.link,
       );
     }
 
