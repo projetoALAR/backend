@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma.service';
 import { LlmService } from './llm.service';
 import { ChatContextService } from './chat-context.service';
+import { filtrarFontesCitadas, type ChatFonte } from './chat-fonte.types';
 
 @Injectable()
 export class ChatService {
@@ -140,6 +141,7 @@ export class ChatService {
     }));
 
     let resposta: string;
+    let fontesResposta: ChatFonte[] = [];
     try {
       if (conversa.processoId) {
         const caso = await this.chatContext.montarContextoCaso(
@@ -153,6 +155,7 @@ export class ChatService {
           imagensUrls: caso.imagensUrls,
           detalheImagem: pedeArquivos ? 'high' : 'auto',
         });
+        fontesResposta = filtrarFontesCitadas(resposta, caso.fontes);
       } else {
         const contextoProjeto = await this.chatContext.montarContexto({
           pergunta: conteudo,
@@ -173,6 +176,10 @@ export class ChatService {
         conversacaoId,
         conteudo: resposta,
         isUser: false,
+        fontes:
+          fontesResposta.length > 0
+            ? (fontesResposta as object[])
+            : undefined,
       },
     });
 

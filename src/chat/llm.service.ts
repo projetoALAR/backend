@@ -86,6 +86,7 @@ export class LlmService {
           'Use SEMPRE o contexto do caso fornecido (dados, cliente, prazos, lista de arquivos e textos/PDFs extraídos).',
           'Quando houver imagens anexadas na mensagem do usuário, analise o conteúdo visual e relate o que aparece de forma objetiva.',
           'OBRIGATÓRIO: se fizer resumo do caso ou listar anexos, mencione TODOS os arquivos do inventário pelo nome — nunca omita um anexo.',
+          'Ao usar trecho de documento, cite o arquivo pelo nome entre colchetes, ex.: [contrato.pdf].',
           'Responda com base nos fatos deste caso. Não invente documentos, datas ou partes.',
           'Se a pergunta for sobre a imagem/anexo, descreva o que vê e relacione com o caso.',
           'Respostas conversacionais curtas quando a pergunta for curta; análises profundas quando pedirem resumo/análise.',

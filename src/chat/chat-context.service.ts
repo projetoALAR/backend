@@ -1,10 +1,15 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { DocumentosService } from '../documentos/documentos.service';
+import {
+  type ChatFonte,
+  extrairTrechoRelevante,
+} from './chat-fonte.types';
 
 export type CasoLlmAnexo = {
   textoContexto: string;
   imagensUrls: string[];
+  fontes: ChatFonte[];
 };
 
 const IMAGE_EXT = new Set([
@@ -257,6 +262,7 @@ export class ChatContextService {
 
     const imagensUrls: string[] = [];
     const textosExtraidos: string[] = [];
+    const fontes: ChatFonte[] = [];
     let textFilesUsed = 0;
     let pdfFilesUsed = 0;
 
@@ -277,12 +283,25 @@ export class ChatContextService {
 
         if (tipo === 'imagem' && signedUrl && imagensUrls.length < MAX_IMAGES) {
           imagensUrls.push(signedUrl);
+          fontes.push({
+            documentoId: doc.id,
+            nome: doc.nome,
+            trecho: null,
+            tipo: 'imagem',
+          });
         }
 
         if (tipo === 'texto' && signedUrl && textFilesUsed < MAX_TEXT_FILES) {
           const texto = await this.baixarTexto(signedUrl, doc.nome);
           if (texto) {
             textFilesUsed += 1;
+            const trecho = extrairTrechoRelevante(texto, pergunta);
+            fontes.push({
+              documentoId: doc.id,
+              nome: doc.nome,
+              trecho: trecho || null,
+              tipo: 'texto',
+            });
             textosExtraidos.push(
               `### Conteúdo textual de "${doc.nome}"\n${texto}`,
             );
@@ -293,6 +312,13 @@ export class ChatContextService {
           const textoPdf = await this.baixarPdfTexto(signedUrl, doc.nome);
           if (textoPdf) {
             pdfFilesUsed += 1;
+            const trecho = extrairTrechoRelevante(textoPdf, pergunta);
+            fontes.push({
+              documentoId: doc.id,
+              nome: doc.nome,
+              trecho: trecho || null,
+              tipo: 'pdf',
+            });
             textosExtraidos.push(
               `### Conteúdo extraído do PDF "${doc.nome}"\n${textoPdf}`,
             );
@@ -315,6 +341,7 @@ export class ChatContextService {
           `${i + 1}. ${d.nome} (${this.classificarArquivo(this.extensao(d.nome))})`,
       ),
       '- Em QUALQUER resumo do caso, liste TODOS esses arquivos pelo nome. Não omita nenhum.',
+      '- Ao usar informação de um arquivo, cite o nome exato entre colchetes, ex.: [peticao.pdf].',
     );
 
     if (textosExtraidos.length > 0) {
@@ -346,6 +373,7 @@ export class ChatContextService {
     return {
       textoContexto: linhas.join('\n'),
       imagensUrls,
+      fontes,
     };
   }
 

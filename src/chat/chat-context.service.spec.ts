@@ -102,6 +102,7 @@ describe('ChatContextService', () => {
     expect(resultado.textoContexto).toContain('## Andamentos recentes');
     expect(resultado.textoContexto).toContain('Distribuição');
     expect(resultado.imagensUrls).toEqual([]);
+    expect(resultado.fontes).toEqual([]);
     expect(prisma.andamento.findMany).toHaveBeenCalledWith({
       where: { processoId: 'p1' },
       orderBy: { data: 'desc' },

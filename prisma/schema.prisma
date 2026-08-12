@@ -223,6 +223,7 @@ model Mensagem {
   id            String   @id @default(uuid())
   conteudo      String
   isUser        Boolean
+  fontes        Json?
   criadoEm      DateTime @default(now())
 
   conversacaoId String
