@@ -120,13 +120,17 @@ enum Role {
 }
 
 model Usuario {
-  id        String   @id @default(uuid())
-  nome      String
-  email     String   @unique
-  senhaHash String
-  role      Role     @default(ASSISTENTE)
-  fotoUrl   String?
-  criadoEm  DateTime @default(now())
+  id                 String   @id @default(uuid())
+  nome               String
+  email              String   @unique
+  senhaHash          String
+  role               Role     @default(ASSISTENTE)
+  fotoUrl            String?
+  totpSecret         String?
+  totpPendingSecret  String?
+  totpEnabled        Boolean  @default(false)
+  totpRecoveryHashes String[] @default([])
+  criadoEm           DateTime @default(now())
 
   preferencia  Preferencia?
   inbox        InboxItem[]

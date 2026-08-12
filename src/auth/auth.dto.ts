@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 import { Role } from './roles';
@@ -55,4 +56,33 @@ export class ChangePasswordDto {
   @IsString()
   @IsSenhaForte()
   novaSenha!: string;
+}
+
+export class Enable2faDto {
+  @IsString()
+  @MinLength(6, { message: 'Informe o código de 6 dígitos' })
+  @MaxLength(12)
+  code!: string;
+}
+
+export class Disable2faDto {
+  @IsString()
+  @MinLength(1, { message: 'Senha atual obrigatória' })
+  senha!: string;
+
+  @IsString()
+  @MinLength(6, { message: 'Informe o código 2FA ou de recuperação' })
+  @MaxLength(20)
+  code!: string;
+}
+
+export class Verify2faDto {
+  @IsString()
+  @MinLength(10)
+  preAuthToken!: string;
+
+  @IsString()
+  @MinLength(6, { message: 'Informe o código 2FA ou de recuperação' })
+  @MaxLength(20)
+  code!: string;
 }

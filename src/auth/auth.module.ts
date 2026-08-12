@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma.service';
 import { DocumentosModule } from '../documentos/documentos.module';
 import { EquipeModule } from '../equipe/equipe.module';
 import { LoginLockoutService } from './login-lockout.service';
+import { TotpService } from './totp.service';
 
 @Module({
   imports: [
@@ -29,7 +30,13 @@ import { LoginLockoutService } from './login-lockout.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, PrismaService, LoginLockoutService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    PrismaService,
+    LoginLockoutService,
+    TotpService,
+  ],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

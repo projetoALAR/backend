@@ -10,6 +10,9 @@ import {
   LoginDto,
   RegisterDto,
   ChangePasswordDto,
+  Enable2faDto,
+  Disable2faDto,
+  Verify2faDto,
 } from './auth.dto';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
@@ -41,6 +44,63 @@ export class AuthController {
   @Post('login')
   login(@Body() body: LoginDto) {
     return this.authService.login(body);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('2fa/verify')
+  verifyTwoFactor(@Body() body: Verify2faDto) {
+    return this.authService.verifyTwoFactorLogin(body.preAuthToken, body.code);
+  }
+
+  @Roles(Role.ADMIN)
+  @Get('2fa/status')
+  twoFactorStatus(@CurrentUser() user: { id: string }) {
+    return this.authService.twoFactorStatus(user.id);
+  }
+
+  @Roles(Role.ADMIN)
+  @Post('2fa/setup')
+  setupTwoFactor(@CurrentUser() user: { id: string }) {
+    return this.authService.setupTwoFactor(user.id);
+  }
+
+  @Roles(Role.ADMIN)
+  @Post('2fa/enable')
+  async enableTwoFactor(
+    @Body() body: Enable2faDto,
+    @CurrentUser() ator: AuditActor & { id: string },
+  ) {
+    const result = await this.authService.enableTwoFactor(ator.id, body.code);
+    await this.auditoria.registrar({
+      acao: 'EDITAR',
+      entidade: 'USUARIO',
+      entidadeId: ator.id,
+      resumo: 'Ativou autenticação em dois fatores (2FA)',
+      ator,
+    });
+    return result;
+  }
+
+  @Roles(Role.ADMIN)
+  @Post('2fa/disable')
+  async disableTwoFactor(
+    @Body() body: Disable2faDto,
+    @CurrentUser() ator: AuditActor & { id: string },
+  ) {
+    const result = await this.authService.disableTwoFactor(
+      ator.id,
+      body.senha,
+      body.code,
+    );
+    await this.auditoria.registrar({
+      acao: 'EDITAR',
+      entidade: 'USUARIO',
+      entidadeId: ator.id,
+      resumo: 'Desativou autenticação em dois fatores (2FA)',
+      ator,
+    });
+    return result;
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)

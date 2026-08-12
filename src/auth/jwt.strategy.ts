@@ -10,6 +10,7 @@ export type JwtPayload = {
   sub: string;
   email: string;
   role?: Role;
+  typ?: string;
 };
 
 @Injectable()
@@ -26,6 +27,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
+    if (payload.typ === '2fa') {
+      throw new UnauthorizedException('Complete o 2FA para acessar');
+    }
+
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: payload.sub },
     });
@@ -34,8 +39,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Usuário não encontrado');
     }
 
-    const { senhaHash: _senhaHash, ...user } = usuario;
+    const {
+      senhaHash: _senhaHash,
+      totpSecret: _totpSecret,
+      totpPendingSecret: _totpPendingSecret,
+      totpRecoveryHashes: _totpRecoveryHashes,
+      ...user
+    } = usuario;
     void _senhaHash;
+    void _totpSecret;
+    void _totpPendingSecret;
+    void _totpRecoveryHashes;
     return user;
   }
 }

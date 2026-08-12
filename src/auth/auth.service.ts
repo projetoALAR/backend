@@ -16,6 +16,7 @@ import { DocumentosService } from '../documentos/documentos.service';
 import { EquipeService } from '../equipe/equipe.service';
 import { LoginLockoutService } from './login-lockout.service';
 import { assertSenhaForte } from './password-policy';
+import { TotpService } from './totp.service';
 
 export type AuthUser = {
   id: string;
@@ -24,6 +25,7 @@ export type AuthUser = {
   role: Role;
   fotoUrl: string | null;
   criadoEm: Date;
+  totpEnabled: boolean;
 };
 
 @Injectable()
@@ -37,6 +39,7 @@ export class AuthService implements OnModuleInit {
     private readonly documentos: DocumentosService,
     private readonly equipe: EquipeService,
     private readonly lockout: LoginLockoutService,
+    private readonly totp: TotpService,
   ) {}
 
   async onModuleInit() {
@@ -93,6 +96,7 @@ export class AuthService implements OnModuleInit {
     role: Role;
     fotoUrl: string | null;
     criadoEm: Date;
+    totpEnabled?: boolean;
   }): Promise<AuthUser> {
     const fotoUrl = usuario.fotoUrl
       ? await this.documentos.resolveSignedUrl(usuario.fotoUrl)
@@ -104,6 +108,7 @@ export class AuthService implements OnModuleInit {
       role: usuario.role,
       fotoUrl,
       criadoEm: usuario.criadoEm,
+      totpEnabled: !!usuario.totpEnabled,
     };
   }
 
@@ -113,6 +118,18 @@ export class AuthService implements OnModuleInit {
       email: user.email,
       role: user.role,
     });
+  }
+
+  private signPre2faToken(user: { id: string; email: string; role: Role }) {
+    return this.jwt.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        typ: '2fa',
+      },
+      { expiresIn: '5m' },
+    );
   }
 
   async register(dados: {
@@ -225,6 +242,14 @@ export class AuthService implements OnModuleInit {
     }
 
     this.lockout.registerSuccess(email);
+
+    if (usuario.role === Role.ADMIN && usuario.totpEnabled) {
+      return {
+        requires2fa: true as const,
+        preAuthToken: this.signPre2faToken(usuario),
+      };
+    }
+
     const user = await this.toAuthUser(usuario);
     return {
       access_token: this.signToken(user),
@@ -289,5 +314,169 @@ export class AuthService implements OnModuleInit {
           : null,
       })),
     );
+  }
+
+  async twoFactorStatus(userId: string) {
+    const usuario = await this.requireAdmin(userId);
+    return { enabled: !!usuario.totpEnabled };
+  }
+
+  async setupTwoFactor(userId: string) {
+    const usuario = await this.requireAdmin(userId);
+    const secret = this.totp.createSecret();
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: { totpPendingSecret: secret },
+    });
+    const otpauthUrl = this.totp.otpauthUrl(usuario.email, secret);
+    return {
+      secret,
+      otpauthUrl,
+      qrDataUrl: await this.totp.qrDataUrl(otpauthUrl),
+    };
+  }
+
+  async enableTwoFactor(userId: string, code: string) {
+    const usuario = await this.requireAdmin(userId);
+    const pending = usuario.totpPendingSecret;
+    if (!pending) {
+      throw new BadRequestException(
+        'Gere um QR Code antes de confirmar o 2FA.',
+      );
+    }
+    if (!this.totp.verifyCode(pending, code, usuario.email)) {
+      throw new BadRequestException('Código 2FA inválido');
+    }
+
+    const recoveryCodes = this.totp.generateRecoveryCodes();
+    const totpRecoveryHashes =
+      await this.totp.hashRecoveryCodes(recoveryCodes);
+
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        totpSecret: pending,
+        totpPendingSecret: null,
+        totpEnabled: true,
+        totpRecoveryHashes,
+      },
+    });
+
+    return { ok: true, recoveryCodes };
+  }
+
+  async disableTwoFactor(userId: string, senha: string, code: string) {
+    const usuario = await this.requireAdmin(userId);
+    if (!usuario.totpEnabled || !usuario.totpSecret) {
+      throw new BadRequestException('2FA não está ativo nesta conta');
+    }
+
+    const senhaOk = await bcrypt.compare(senha, usuario.senhaHash);
+    if (!senhaOk) {
+      throw new BadRequestException('Senha atual incorreta');
+    }
+
+    const totpOk = this.totp.verifyCode(
+      usuario.totpSecret,
+      code,
+      usuario.email,
+    );
+    const remaining = totpOk
+      ? usuario.totpRecoveryHashes
+      : await this.totp.consumeRecoveryCode(
+          usuario.totpRecoveryHashes,
+          code,
+        );
+    if (!totpOk && remaining === null) {
+      throw new BadRequestException('Código 2FA inválido');
+    }
+
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        totpSecret: null,
+        totpPendingSecret: null,
+        totpEnabled: false,
+        totpRecoveryHashes: [],
+      },
+    });
+
+    return { ok: true };
+  }
+
+  async verifyTwoFactorLogin(preAuthToken: string, code: string) {
+    let payload: { sub?: string; email?: string; typ?: string };
+    try {
+      payload = this.jwt.verify(preAuthToken) as {
+        sub?: string;
+        email?: string;
+        typ?: string;
+      };
+    } catch {
+      throw new UnauthorizedException('Sessão 2FA expirada. Entre de novo.');
+    }
+
+    if (payload.typ !== '2fa' || !payload.sub || !payload.email) {
+      throw new UnauthorizedException('Token 2FA inválido');
+    }
+
+    const email = payload.email.trim().toLowerCase();
+    this.lockout.assertNotLocked(email);
+
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: payload.sub },
+    });
+    if (
+      !usuario ||
+      usuario.email !== email ||
+      usuario.role !== Role.ADMIN ||
+      !usuario.totpEnabled ||
+      !usuario.totpSecret
+    ) {
+      this.lockout.registerFailure(email);
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    const totpOk = this.totp.verifyCode(
+      usuario.totpSecret,
+      code,
+      usuario.email,
+    );
+    let recoveryHashes = usuario.totpRecoveryHashes;
+    if (!totpOk) {
+      const remaining = await this.totp.consumeRecoveryCode(
+        recoveryHashes,
+        code,
+      );
+      if (remaining === null) {
+        this.lockout.registerFailure(email);
+        throw new UnauthorizedException('Código 2FA inválido');
+      }
+      recoveryHashes = remaining;
+      await this.prisma.usuario.update({
+        where: { id: usuario.id },
+        data: { totpRecoveryHashes: recoveryHashes },
+      });
+    }
+
+    this.lockout.registerSuccess(email);
+    const user = await this.toAuthUser(usuario);
+    return {
+      access_token: this.signToken(user),
+      user,
+    };
+  }
+
+  private async requireAdmin(userId: string) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+    });
+    if (!usuario) {
+      throw new UnauthorizedException('Usuário não encontrado');
+    }
+    if (usuario.role !== Role.ADMIN) {
+      throw new ForbiddenException('2FA está disponível só para administradores');
+    }
+    return usuario;
   }
 }

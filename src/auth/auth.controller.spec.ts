@@ -13,6 +13,11 @@ describe('AuthController', () => {
     changePassword: jest.fn(),
     listUsers: jest.fn(),
     createUserByAdmin: jest.fn(),
+    verifyTwoFactorLogin: jest.fn(),
+    twoFactorStatus: jest.fn(),
+    setupTwoFactor: jest.fn(),
+    enableTwoFactor: jest.fn(),
+    disableTwoFactor: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -88,5 +93,19 @@ describe('AuthController', () => {
     ).resolves.toEqual({
       user: { id: 'u2', nome: 'Bob', email: 'bob@alar.com.br' },
     });
+  });
+
+  it('verifyTwoFactor encaminha token e código', async () => {
+    authService.verifyTwoFactorLogin.mockResolvedValue({ access_token: 't' });
+    await expect(
+      controller.verifyTwoFactor({
+        preAuthToken: 'pre',
+        code: '123456',
+      }),
+    ).resolves.toEqual({ access_token: 't' });
+    expect(authService.verifyTwoFactorLogin).toHaveBeenCalledWith(
+      'pre',
+      '123456',
+    );
   });
 });

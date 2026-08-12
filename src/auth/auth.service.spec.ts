@@ -8,6 +8,7 @@ import { DocumentosService } from '../documentos/documentos.service';
 import { EquipeService } from '../equipe/equipe.service';
 import { Role } from './roles';
 import { LoginLockoutService } from './login-lockout.service';
+import { TotpService } from './totp.service';
 
 jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
@@ -34,6 +35,7 @@ describe('AuthService.changePassword', () => {
       documentos as unknown as DocumentosService,
       equipe as unknown as EquipeService,
       new LoginLockoutService(),
+      new TotpService(),
     );
   });
 
@@ -122,6 +124,7 @@ describe('AuthService.createUserByAdmin', () => {
       documentos as unknown as DocumentosService,
       equipe as unknown as EquipeService,
       new LoginLockoutService(),
+      new TotpService(),
     );
 
     const result = await service.createUserByAdmin({
@@ -165,6 +168,7 @@ describe('AuthService.login lockout', () => {
       { resolveSignedUrl: jest.fn() } as unknown as DocumentosService,
       { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
       lockout,
+      new TotpService(),
     );
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
@@ -177,5 +181,67 @@ describe('AuthService.login lockout', () => {
     await expect(
       service.login({ email: 'ana@alar.com.br', senha: 'errada' }),
     ).rejects.toBeInstanceOf(HttpException);
+  });
+});
+
+describe('AuthService.login 2FA', () => {
+  it('pede 2FA quando admin tem TOTP ativo', async () => {
+    const sign = jest.fn().mockReturnValue('pre-2fa');
+    const prisma = {
+      usuario: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'u1',
+          nome: 'Admin',
+          email: 'admin@alar.com.br',
+          senhaHash: 'hash',
+          role: Role.ADMIN,
+          fotoUrl: null,
+          totpEnabled: true,
+          totpSecret: 'SECRET',
+          criadoEm: new Date(),
+        }),
+      },
+    };
+    const service = new AuthService(
+      prisma as unknown as PrismaService,
+      { sign } as unknown as JwtService,
+      {} as ConfigService,
+      { resolveSignedUrl: jest.fn() } as unknown as DocumentosService,
+      { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
+      new LoginLockoutService(),
+      new TotpService(),
+    );
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+    await expect(
+      service.login({ email: 'admin@alar.com.br', senha: 'ok' }),
+    ).resolves.toEqual({
+      requires2fa: true,
+      preAuthToken: 'pre-2fa',
+    });
+    expect(sign).toHaveBeenCalledWith(
+      expect.objectContaining({ typ: '2fa', sub: 'u1' }),
+      { expiresIn: '5m' },
+    );
+  });
+
+  it('rejeita token 2FA inválido', async () => {
+    const service = new AuthService(
+      {} as PrismaService,
+      {
+        verify: jest.fn(() => {
+          throw new Error('jwt malformed');
+        }),
+      } as unknown as JwtService,
+      {} as ConfigService,
+      { resolveSignedUrl: jest.fn() } as unknown as DocumentosService,
+      { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
+      new LoginLockoutService(),
+      new TotpService(),
+    );
+
+    await expect(
+      service.verifyTwoFactorLogin('bad', '123456'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
