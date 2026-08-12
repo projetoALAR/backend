@@ -11,6 +11,7 @@ import { NotificacoesService } from '../notificacoes/notificacoes.service';
 import { DocumentosService } from '../documentos/documentos.service';
 import { Role } from '../auth/roles';
 import { CreateMembroDto, UpdateMembroDto } from './equipe.dto';
+import { assertSenhaForte } from '../auth/password-policy';
 
 const membroInclude = {
   usuario: {
@@ -83,11 +84,12 @@ export class EquipeService {
           );
         }
       } else {
-        if (!dados.senha || dados.senha.length < 8) {
+        if (!dados.senha) {
           throw new BadRequestException(
-            'Informe uma senha (mín. 8 caracteres) para criar o acesso, ou use o e-mail de um usuário existente.',
+            'Informe uma senha forte para criar o acesso, ou use o e-mail de um usuário existente.',
           );
         }
+        assertSenhaForte(dados.senha);
         if (!Object.values(Role).includes(role)) {
           throw new BadRequestException('Papel inválido');
         }

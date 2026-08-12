@@ -1,4 +1,4 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, HttpException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma.service';
 import { DocumentosService } from '../documentos/documentos.service';
 import { EquipeService } from '../equipe/equipe.service';
 import { Role } from './roles';
+import { LoginLockoutService } from './login-lockout.service';
 
 jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
@@ -32,6 +33,7 @@ describe('AuthService.changePassword', () => {
       {} as ConfigService,
       documentos as unknown as DocumentosService,
       equipe as unknown as EquipeService,
+      new LoginLockoutService(),
     );
   });
 
@@ -43,7 +45,7 @@ describe('AuthService.changePassword', () => {
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
     await expect(
-      service.changePassword('u1', 'errada', 'nova-senha-ok'),
+      service.changePassword('u1', 'errada', 'NovaSenha12'),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -69,7 +71,7 @@ describe('AuthService.changePassword', () => {
     prisma.usuario.update.mockResolvedValue({});
 
     await expect(
-      service.changePassword('u1', 'antiga-senha', 'nova-senha-ok'),
+      service.changePassword('u1', 'antiga-senha', 'NovaSenha12'),
     ).resolves.toEqual({ ok: true });
 
     expect(prisma.usuario.update).toHaveBeenCalledWith({
@@ -82,7 +84,7 @@ describe('AuthService.changePassword', () => {
     prisma.usuario.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.changePassword('missing', 'a', 'nova-senha-ok'),
+      service.changePassword('missing', 'a', 'NovaSenha12'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
@@ -119,12 +121,13 @@ describe('AuthService.createUserByAdmin', () => {
       {} as ConfigService,
       documentos as unknown as DocumentosService,
       equipe as unknown as EquipeService,
+      new LoginLockoutService(),
     );
 
     const result = await service.createUserByAdmin({
       nome: 'Ana',
       email: 'ana@alar.com.br',
-      senha: 'senha-forte',
+      senha: 'AlarSenha1x',
       role: Role.ASSISTENTE,
     });
 
@@ -136,5 +139,43 @@ describe('AuthService.createUserByAdmin', () => {
         role: Role.ASSISTENTE,
       }),
     );
+  });
+});
+
+describe('AuthService.login lockout', () => {
+  it('bloqueia após 5 senhas erradas', async () => {
+    const prisma = {
+      usuario: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'u1',
+          nome: 'Ana',
+          email: 'ana@alar.com.br',
+          senhaHash: 'hash',
+          role: Role.ASSISTENTE,
+          fotoUrl: null,
+          criadoEm: new Date(),
+        }),
+      },
+    };
+    const lockout = new LoginLockoutService();
+    const service = new AuthService(
+      prisma as unknown as PrismaService,
+      { sign: jest.fn() } as unknown as JwtService,
+      {} as ConfigService,
+      { resolveSignedUrl: jest.fn() } as unknown as DocumentosService,
+      { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
+      lockout,
+    );
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        service.login({ email: 'ana@alar.com.br', senha: 'errada' }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    }
+
+    await expect(
+      service.login({ email: 'ana@alar.com.br', senha: 'errada' }),
+    ).rejects.toBeInstanceOf(HttpException);
   });
 });

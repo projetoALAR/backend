@@ -9,6 +9,7 @@ import { resolveJwtSecret } from './jwt-secret';
 import { PrismaService } from '../prisma.service';
 import { DocumentosModule } from '../documentos/documentos.module';
 import { EquipeModule } from '../equipe/equipe.module';
+import { LoginLockoutService } from './login-lockout.service';
 
 @Module({
   imports: [
@@ -28,7 +29,7 @@ import { EquipeModule } from '../equipe/equipe.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, PrismaService],
+  providers: [AuthService, JwtStrategy, PrismaService, LoginLockoutService],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

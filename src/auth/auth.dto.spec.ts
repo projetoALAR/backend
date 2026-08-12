@@ -18,7 +18,7 @@ describe('Auth DTOs', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('exige senha longa no register', async () => {
+  it('exige senha forte no register', async () => {
     const dto = plainToInstance(RegisterDto, {
       nome: 'Ana',
       email: 'ana@alar.com.br',
@@ -28,12 +28,22 @@ describe('Auth DTOs', () => {
     expect(errors.some((e) => e.property === 'senha')).toBe(true);
   });
 
-  it('exige nova senha com 8+ caracteres', async () => {
+  it('exige nova senha forte', async () => {
     const dto = plainToInstance(ChangePasswordDto, {
       senhaAtual: 'antiga-senha',
       novaSenha: '123',
     });
     const errors = await validate(dto);
     expect(errors.some((e) => e.property === 'novaSenha')).toBe(true);
+  });
+
+  it('aceita senha forte no register', async () => {
+    const dto = plainToInstance(RegisterDto, {
+      nome: 'Ana',
+      email: 'ana@alar.com.br',
+      senha: 'AlarSenha1x',
+    });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
   });
 });

@@ -6,6 +6,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { Role } from './roles';
+import { IsSenhaForte } from './password-policy';
 
 export class LoginDto {
   @IsEmail({}, { message: 'E-mail inválido' })
@@ -25,7 +26,7 @@ export class RegisterDto {
   email!: string;
 
   @IsString()
-  @MinLength(8, { message: 'A senha deve ter pelo menos 8 caracteres' })
+  @IsSenhaForte()
   senha!: string;
 }
 
@@ -38,7 +39,7 @@ export class CreateUserDto {
   email!: string;
 
   @IsString()
-  @MinLength(8)
+  @IsSenhaForte()
   senha!: string;
 
   @IsOptional()
@@ -52,6 +53,6 @@ export class ChangePasswordDto {
   senhaAtual!: string;
 
   @IsString()
-  @MinLength(8, { message: 'A nova senha deve ter pelo menos 8 caracteres' })
+  @IsSenhaForte()
   novaSenha!: string;
 }

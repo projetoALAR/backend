@@ -4,8 +4,10 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { Role } from '../auth/roles';
+import { IsSenhaForte } from '../auth/password-policy';
 
 export class CreateMembroDto {
   @IsString()
@@ -25,8 +27,9 @@ export class CreateMembroDto {
 
   /** Obrigatória se o e-mail ainda não tiver conta de login. */
   @IsOptional()
+  @ValidateIf((_, v) => typeof v === 'string' && v.length > 0)
   @IsString()
-  @MinLength(8, { message: 'A senha deve ter pelo menos 8 caracteres' })
+  @IsSenhaForte()
   senha?: string;
 
   @IsOptional()

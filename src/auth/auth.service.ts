@@ -14,6 +14,8 @@ import { PrismaService } from '../prisma.service';
 import { Role } from './roles';
 import { DocumentosService } from '../documentos/documentos.service';
 import { EquipeService } from '../equipe/equipe.service';
+import { LoginLockoutService } from './login-lockout.service';
+import { assertSenhaForte } from './password-policy';
 
 export type AuthUser = {
   id: string;
@@ -34,6 +36,7 @@ export class AuthService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly documentos: DocumentosService,
     private readonly equipe: EquipeService,
+    private readonly lockout: LoginLockoutService,
   ) {}
 
   async onModuleInit() {
@@ -52,9 +55,9 @@ export class AuthService implements OnModuleInit {
     if (count > 0) return;
 
     const password = this.config.get<string>('AUTH_ADMIN_PASSWORD');
-    if (!password || password.trim().length < 8) {
+    if (!password || !password.trim()) {
       this.logger.warn(
-        'Nenhum usuário no banco e AUTH_ADMIN_PASSWORD ausente ou com menos de 8 caracteres — admin não foi criado.',
+        'Nenhum usuário no banco e AUTH_ADMIN_PASSWORD ausente — admin não foi criado.',
       );
       return;
     }
@@ -165,9 +168,7 @@ export class AuthService implements OnModuleInit {
     role: Role;
   }): Promise<AuthUser> {
     const email = dados.email.trim().toLowerCase();
-    if (!dados.senha || dados.senha.length < 8) {
-      throw new BadRequestException('A senha deve ter pelo menos 8 caracteres');
-    }
+    assertSenhaForte(dados.senha);
 
     const existing = await this.prisma.usuario.findUnique({
       where: { email },
@@ -206,19 +207,24 @@ export class AuthService implements OnModuleInit {
 
   async login(dados: { email: string; senha: string }) {
     const email = dados.email.trim().toLowerCase();
+    this.lockout.assertNotLocked(email);
+
     const usuario = await this.prisma.usuario.findUnique({
       where: { email },
     });
 
     if (!usuario) {
+      this.lockout.registerFailure(email);
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
     const ok = await bcrypt.compare(dados.senha, usuario.senhaHash);
     if (!ok) {
+      this.lockout.registerFailure(email);
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
+    this.lockout.registerSuccess(email);
     const user = await this.toAuthUser(usuario);
     return {
       access_token: this.signToken(user),
@@ -253,11 +259,7 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException('A nova senha deve ser diferente da atual');
     }
 
-    if (!novaSenha || novaSenha.length < 8) {
-      throw new BadRequestException(
-        'A nova senha deve ter pelo menos 8 caracteres',
-      );
-    }
+    assertSenhaForte(novaSenha);
 
     await this.prisma.usuario.update({
       where: { id: userId },
