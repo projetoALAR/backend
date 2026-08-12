@@ -6,11 +6,12 @@ import {
   Body,
   Param,
   ParseUUIDPipe,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
-import { MensagemFeedbackDto } from './chat.dto';
+import { MensagemFeedbackDto, ExportarConversaQueryDto } from './chat.dto';
 import { CreateConversaDto, EnviarMensagemDto } from '../common/common.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
@@ -61,6 +62,19 @@ export class ChatController {
   ) {
     await this.casoAcesso.assertPodeVer(user, processoId);
     return this.chatService.obterOuCriarPorProcesso(processoId, user.id);
+  }
+
+  @Get('conversas/:id/export')
+  exportarConversa(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ExportarConversaQueryDto,
+  ) {
+    return this.chatService.exportarConversa(
+      id,
+      user.id,
+      query.formato ?? 'markdown',
+    );
   }
 
   @Get('conversas/:id')

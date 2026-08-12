@@ -9,6 +9,10 @@ import { ChatContextService } from './chat-context.service';
 import { filtrarFontesCitadas, type ChatFonte } from './chat-fonte.types';
 import { ChatQuotaService } from './chat-quota.service';
 import type { Role } from '../auth/roles';
+import {
+  exportarConversaJson,
+  exportarConversaMarkdown,
+} from './chat-export';
 
 @Injectable()
 export class ChatService {
@@ -233,5 +237,34 @@ export class ChatService {
 
   metricasAdmin() {
     return this.chatQuota.metricasAdmin();
+  }
+
+  async exportarConversa(
+    id: string,
+    usuarioId: string,
+    formato: 'markdown' | 'json' = 'markdown',
+  ) {
+    const conversa = await this.prisma.conversacao.findUnique({
+      where: { id },
+      include: {
+        mensagens: { orderBy: { criadoEm: 'asc' } },
+        processo: { select: { titulo: true, numero: true } },
+      },
+    });
+    if (!conversa) {
+      throw new NotFoundException('Conversa não encontrada.');
+    }
+    if (conversa.usuarioId !== usuarioId) {
+      throw new ForbiddenException('Você não tem acesso a esta conversa.');
+    }
+
+    const exportFn =
+      formato === 'json' ? exportarConversaJson : exportarConversaMarkdown;
+    const resultado = exportFn(conversa);
+
+    return {
+      formato,
+      ...resultado,
+    };
   }
 }
