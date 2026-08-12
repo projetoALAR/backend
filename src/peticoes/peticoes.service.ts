@@ -7,11 +7,13 @@ import {
 import { PrismaService } from '../prisma.service';
 import { ChatContextService } from '../chat/chat-context.service';
 import { LlmService } from '../chat/llm.service';
+import { ChatQuotaService } from '../chat/chat-quota.service';
 import { DocumentosService } from '../documentos/documentos.service';
 import { preencherModelo } from '../modelos-documento/placeholder.util';
 import { SalvarRascunhoDto } from './peticoes.dto';
+import type { Role } from '../auth/roles';
 
-const AVISO_RASCUNHO_IA =
+export const AVISO_RASCUNHO_IA =
   'Rascunho gerado por IA — revise antes de usar. Não substitui a análise de um advogado habilitado.';
 
 @Injectable()
@@ -23,9 +25,17 @@ export class PeticoesService {
     private readonly chatContext: ChatContextService,
     private readonly llm: LlmService,
     private readonly documentos: DocumentosService,
+    private readonly chatQuota: ChatQuotaService,
   ) {}
 
-  async gerarRascunho(modeloId: string, processoId: string) {
+  async gerarRascunho(
+    modeloId: string,
+    processoId: string,
+    usuarioId: string,
+    role?: Role,
+  ) {
+    await this.chatQuota.assertPodeUsar(usuarioId, role);
+
     const modelo = await this.prisma.modeloDocumento.findUnique({
       where: { id: modeloId },
     });
@@ -56,8 +66,10 @@ export class PeticoesService {
 
     const prompt = [
       `Expanda o esqueleto abaixo em um rascunho COMPLETO de documento jurídico do tipo "${modelo.categoria}", em português do Brasil.`,
-      'Use os fatos do contexto do caso. Não invente partes, valores ou decisões que não estejam no contexto.',
-      'Mantenha estrutura formal adequada à peça. O texto deve estar pronto para revisão humana.',
+      'Use APENAS os fatos do contexto do caso e do esqueleto.',
+      'NÃO invente jurisprudência, súmulas, acórdãos, números de processo, valores, datas ou partes que não estejam no contexto.',
+      'Se faltar informação essencial, indique claramente com [A COMPLETAR] em vez de inventar.',
+      'Mantenha estrutura formal adequada à peça. O texto deve estar pronto para revisão humana obrigatória.',
       `Finalize SEMPRE com exatamente esta linha (sem aspas): ${AVISO_RASCUNHO_IA}`,
       '',
       '## Esqueleto preenchido (modelo)',
@@ -67,7 +79,11 @@ export class PeticoesService {
       textoContexto,
     ].join('\n');
 
-    const textoBruto = await this.llm.gerarTextoDocumento(prompt);
+    const { content: textoBruto, tokensUsados } =
+      await this.llm.gerarTextoDocumentoComUso(prompt, {
+        proposito: 'rascunho',
+      });
+
     if (textoBruto.includes('Não consegui obter resposta da IA')) {
       this.logger.warn(`Falha LLM ao gerar rascunho modelo=${modeloId}`);
       throw new ServiceUnavailableException(
@@ -80,7 +96,11 @@ export class PeticoesService {
       texto = `${texto}\n\n${AVISO_RASCUNHO_IA}`;
     }
 
-    return { texto };
+    this.logger.log(
+      `Rascunho gerado processo=${processoId} tokens=${tokensUsados}`,
+    );
+
+    return { texto, tokensUsados };
   }
 
   async salvarRascunho(dados: SalvarRascunhoDto) {

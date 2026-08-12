@@ -11,6 +11,6 @@ import { DocumentosModule } from '../documentos/documentos.module';
   imports: [DocumentosModule],
   controllers: [ChatController],
   providers: [ChatService, LlmService, ChatContextService, ChatQuotaService, PrismaService],
-  exports: [LlmService, ChatContextService],
+  exports: [LlmService, ChatContextService, ChatQuotaService],
 })
 export class ChatModule {}

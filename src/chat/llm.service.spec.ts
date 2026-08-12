@@ -86,5 +86,23 @@ describe('LlmService', () => {
       expect(body.messages[0].role).toBe('system');
       expect(body.messages[0].content).toMatch(/PLAUSÍVEIS e GENÉRICOS/);
     });
+
+    it('proposito rascunho usa prompt anti-alucinação', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'Rascunho ok\n\nRascunho gerado por IA — revise antes de usar. Não substitui a análise de um advogado habilitado.' } }],
+          usage: { total_tokens: 100 },
+        }),
+      });
+
+      const service = buildService({ OPENAI_API_KEY: 'sk-test' });
+      await service.gerarTextoDocumento('gere petição', { proposito: 'rascunho' });
+      const body = JSON.parse(
+        (global.fetch as jest.Mock).mock.calls[0][1].body as string,
+      ) as { messages: { role: string; content: string }[] };
+      expect(body.messages[0].content).toMatch(/NÃO invente jurisprudência/);
+      expect(body.messages[0].content).toMatch(/revisão humana/);
+    });
   });
 });

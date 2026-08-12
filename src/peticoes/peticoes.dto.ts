@@ -1,4 +1,11 @@
-import { IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+  Equals,
+  IsBoolean,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class GerarRascunhoDto {
   @IsUUID()
@@ -20,4 +27,12 @@ export class SalvarRascunhoDto {
   @IsString()
   @MinLength(1)
   texto!: string;
+
+  /** Obrigatório: confirma que um humano revisou o rascunho antes de salvar. */
+  @IsBoolean()
+  @Equals(true, {
+    message:
+      'Confirme a revisão humana do rascunho (revisaoConfirmada deve ser true) antes de salvar.',
+  })
+  revisaoConfirmada!: boolean;
 }

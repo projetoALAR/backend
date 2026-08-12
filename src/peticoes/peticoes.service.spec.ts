@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma.service';
 import { ChatContextService } from '../chat/chat-context.service';
 import { LlmService } from '../chat/llm.service';
 import { DocumentosService } from '../documentos/documentos.service';
+import { ChatQuotaService } from '../chat/chat-quota.service';
+import { Role } from '../auth/roles';
 
 describe('PeticoesService', () => {
   const prisma = {
@@ -14,10 +16,13 @@ describe('PeticoesService', () => {
     montarContextoCaso: jest.fn(),
   };
   const llm = {
-    gerarTextoDocumento: jest.fn(),
+    gerarTextoDocumentoComUso: jest.fn(),
   };
   const documentos = {
     criarDocumentoDeTexto: jest.fn(),
+  };
+  const chatQuota = {
+    assertPodeUsar: jest.fn().mockResolvedValue(undefined),
   };
 
   let service: PeticoesService;
@@ -29,6 +34,7 @@ describe('PeticoesService', () => {
       chatContext as unknown as ChatContextService,
       llm as unknown as LlmService,
       documentos as unknown as DocumentosService,
+      chatQuota as unknown as ChatQuotaService,
     );
   });
 
@@ -51,22 +57,28 @@ describe('PeticoesService', () => {
       textoContexto: 'contexto do caso',
       imagensUrls: [],
     });
-    llm.gerarTextoDocumento.mockResolvedValue(
-      'Texto expandido do rascunho.\n\nRascunho gerado por IA — revise antes de usar. Não substitui a análise de um advogado habilitado.',
-    );
+    llm.gerarTextoDocumentoComUso.mockResolvedValue({
+      content:
+        'Texto expandido do rascunho.\n\nRascunho gerado por IA — revise antes de usar. Não substitui a análise de um advogado habilitado.',
+      tokensUsados: 200,
+    });
 
-    const result = await service.gerarRascunho('m1', 'p1');
+    const result = await service.gerarRascunho('m1', 'p1', 'u1', Role.ADVOGADO);
     expect(result.texto).toContain('Texto expandido');
     expect(result.texto).toContain('Rascunho gerado por IA');
-    expect(llm.gerarTextoDocumento).toHaveBeenCalled();
+    expect(chatQuota.assertPodeUsar).toHaveBeenCalledWith('u1', Role.ADVOGADO);
+    expect(llm.gerarTextoDocumentoComUso).toHaveBeenCalledWith(
+      expect.any(String),
+      { proposito: 'rascunho' },
+    );
     expect(chatContext.montarContextoCaso).toHaveBeenCalledWith('p1');
   });
 
   it('gerarRascunho lança NotFound se modelo não existe', async () => {
     prisma.modeloDocumento.findUnique.mockResolvedValue(null);
-    await expect(service.gerarRascunho('m-x', 'p1')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.gerarRascunho('m-x', 'p1', 'u1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('gerarRascunho lança NotFound se processo não existe', async () => {
@@ -76,9 +88,9 @@ describe('PeticoesService', () => {
       categoria: 'Petição',
     });
     prisma.processo.findUnique.mockResolvedValue(null);
-    await expect(service.gerarRascunho('m1', 'p-x')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.gerarRascunho('m1', 'p-x', 'u1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('gerarRascunho lança ServiceUnavailable se LLM falhar', async () => {
@@ -100,13 +112,14 @@ describe('PeticoesService', () => {
       textoContexto: 'ctx',
       imagensUrls: [],
     });
-    llm.gerarTextoDocumento.mockResolvedValue(
-      'Não consegui obter resposta da IA agora.',
-    );
+    llm.gerarTextoDocumentoComUso.mockResolvedValue({
+      content: 'Não consegui obter resposta da IA agora.',
+      tokensUsados: 10,
+    });
 
-    await expect(service.gerarRascunho('m1', 'p1')).rejects.toBeInstanceOf(
-      ServiceUnavailableException,
-    );
+    await expect(
+      service.gerarRascunho('m1', 'p1', 'u1'),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
   it('salvarRascunho delega para DocumentosService', async () => {
@@ -115,6 +128,7 @@ describe('PeticoesService', () => {
       processoId: 'p1',
       nomeArquivo: 'Petição - Caso.pdf',
       texto: 'conteúdo',
+      revisaoConfirmada: true,
     });
     expect(doc).toEqual({ id: 'd1' });
     expect(documentos.criarDocumentoDeTexto).toHaveBeenCalledWith(

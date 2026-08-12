@@ -90,6 +90,8 @@ export class LlmService {
     const model = this.config.get<string>('OPENAI_MODEL') || 'gpt-4o-mini';
 
     const modoCaso = opts.modo === 'caso';
+    const antiAlucinacao =
+      'NÃO invente jurisprudência, súmulas, acórdãos, ementas, números de processo ou decisões judiciais. Se não houver base no contexto, diga explicitamente que não encontrou.';
     const systemPrompt = modoCaso
       ? [
           'Você é o assistente do Alar dedicado a UM caso específico (aberto no painel do processo).',
@@ -98,6 +100,7 @@ export class LlmService {
           'OBRIGATÓRIO: se fizer resumo do caso ou listar anexos, mencione TODOS os arquivos do inventário pelo nome — nunca omita um anexo.',
           'Ao usar trecho de documento, cite o arquivo pelo nome entre colchetes, ex.: [contrato.pdf].',
           'Responda com base nos fatos deste caso. Não invente documentos, datas ou partes.',
+          antiAlucinacao,
           'Se a pergunta for sobre a imagem/anexo, descreva o que vê e relacione com o caso.',
           'Respostas conversacionais curtas quando a pergunta for curta; análises profundas quando pedirem resumo/análise.',
           'Responda em português do Brasil. Aviso: não substitui parecer de advogado.',
@@ -108,7 +111,9 @@ export class LlmService {
           'PRIVACIDADE CRÍTICA: você NÃO tem acesso ao conteúdo interno dos casos (descrição, cliente, documentos, imagens, vídeos, chats do caso).',
           'Se pedirem resumo ou detalhes de um caso específico (ex.: "resumo do caso do Matheus"), RECUSE educadamente e diga para abrir o caso no painel e usar o chat dali.',
           'Pode dizer quantos casos ativos existem e listar títulos/números/status.',
-          'Não invente detalhes internos. Responda em português do Brasil.',
+          'Não invente detalhes internos.',
+          antiAlucinacao,
+          'Responda em português do Brasil.',
         ].join(' ');
 
     const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }];
@@ -147,28 +152,44 @@ export class LlmService {
   }
 
   /**
-   * Redige textos jurídicos fictícios de demonstração (petições, sentenças, resumos).
-   * Reutilizável pela futura feature de geração de petições via IA.
+   * Redige texto jurídico. Use proposito `rascunho` para peças reais (com revisão humana)
+   * e `demo` para conteúdo fictício de seed/UI.
    */
-  async gerarTextoDocumento(prompt: string): Promise<string> {
-    const { content } = await this.gerarTextoDocumentoComTokens(prompt);
+  async gerarTextoDocumento(
+    prompt: string,
+    opcoes: { proposito?: 'rascunho' | 'demo' } = {},
+  ): Promise<string> {
+    const { content } = await this.gerarTextoDocumentoComUso(prompt, opcoes);
     return content;
   }
 
-  private async gerarTextoDocumentoComTokens(prompt: string): Promise<LlmResposta> {
+  async gerarTextoDocumentoComUso(
+    prompt: string,
+    opcoes: { proposito?: 'rascunho' | 'demo' } = {},
+  ): Promise<LlmResposta> {
+    const proposito = opcoes.proposito ?? 'demo';
     const apiKey = this.config.get<string>('OPENAI_API_KEY')?.trim();
     if (!apiKey) {
       if (this.isMockAllowed()) {
         this.logger.warn(
           'OPENAI_API_KEY ausente — CHAT_ALLOW_MOCK ativo (texto documento demonstração)',
         );
+        const content =
+          proposito === 'rascunho'
+            ? [
+                '[Modo demonstração] Rascunho jurídico genérico para revisão humana.',
+                'Substitua os trechos [A COMPLETAR] com dados reais do caso.',
+                '',
+                'Rascunho gerado por IA — revise antes de usar. Não substitui a análise de um advogado habilitado.',
+              ].join('\n')
+            : [
+                '[CONTEÚDO FICTÍCIO GERADO PARA TESTE — não representa o processo real sob este número CNJ]',
+                '',
+                '[Modo demonstração] Texto jurídico genérico de simulação para fins de UI.',
+                'Trata-se de narrativa plausível e não de fatos reais sobre partes, valores ou decisões.',
+              ].join('\n');
         return {
-          content: [
-            '[CONTEÚDO FICTÍCIO GERADO PARA TESTE — não representa o processo real sob este número CNJ]',
-            '',
-            '[Modo demonstração] Texto jurídico genérico de simulação para fins de UI.',
-            'Trata-se de narrativa plausível e não de fatos reais sobre partes, valores ou decisões.',
-          ].join('\n'),
+          content,
           tokensUsados: this.estimarTokens(prompt),
         };
       }
@@ -181,13 +202,24 @@ export class LlmService {
       this.config.get<string>('OPENAI_BASE_URL') || 'https://api.openai.com/v1';
     const model = this.config.get<string>('OPENAI_MODEL') || 'gpt-4o-mini';
 
-    const systemPrompt = [
-      'Gere textos jurídicos PLAUSÍVEIS e GENÉRICOS para fins de demonstração de software.',
-      'Nunca afirme fatos específicos como se fossem reais.',
-      'Não invente nomes de partes reais, valores concretos ou decisões específicas de processos identificados por número CNJ.',
-      'Sempre inclua a marca de conteúdo fictício fornecida pelo usuário (no início ou no fim do texto).',
-      'Responda em português do Brasil, em prosa clara adequada a peças processuais de demonstração.',
-    ].join(' ');
+    const systemPrompt =
+      proposito === 'rascunho'
+        ? [
+            'Você redige RASCUNHOS jurídicos para revisão humana obrigatória no software Alar.',
+            'Use apenas fatos e dados fornecidos no prompt do usuário.',
+            'NÃO invente jurisprudência, súmulas, acórdãos, ementas, números de processo, valores, datas ou partes.',
+            'Se faltar informação, use o marcador [A COMPLETAR] em vez de inventar.',
+            'Não afirme como verdade o que não estiver no contexto.',
+            'Responda em português do Brasil, em prosa formal adequada à peça.',
+            'O texto deve ser tratado como rascunho — nunca como documento final.',
+          ].join(' ')
+        : [
+            'Gere textos jurídicos PLAUSÍVEIS e GENÉRICOS para fins de demonstração de software.',
+            'Nunca afirme fatos específicos como se fossem reais.',
+            'Não invente nomes de partes reais, valores concretos ou decisões específicas de processos identificados por número CNJ.',
+            'Sempre inclua a marca de conteúdo fictício fornecida pelo usuário (no início ou no fim do texto).',
+            'Responda em português do Brasil, em prosa clara adequada a peças processuais de demonstração.',
+          ].join(' ');
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -195,7 +227,7 @@ export class LlmService {
     ];
 
     return this.chamarChatCompletions(apiKey, baseUrl, model, messages, {
-      temperature: 0.5,
+      temperature: proposito === 'rascunho' ? 0.3 : 0.5,
     });
   }
 
