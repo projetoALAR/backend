@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
 import { CreateConversaDto, EnviarMensagemDto } from '../common/common.dto';
@@ -19,6 +20,8 @@ import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
 type AuthUser = CasoAcessoUser;
 
 @Controller('chat')
+@ApiTags('Chat')
+@ApiBearerAuth('JWT')
 @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
 export class ChatController {
   constructor(

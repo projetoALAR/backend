@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
@@ -18,6 +19,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
 
 @Controller('auth')
+@ApiTags('Auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,

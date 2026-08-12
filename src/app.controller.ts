@@ -4,12 +4,14 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import * as Sentry from '@sentry/nestjs';
 import { AppService } from './app.service';
 import { Public } from './auth/public.decorator';
 import { PrismaService } from './prisma.service';
 
 @Controller()
+@ApiTags('Sistema')
 export class AppController {
   constructor(
     private readonly appService: AppService,

@@ -1,4 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -7,6 +8,8 @@ import { BuscaService } from './busca.service';
 import { BuscaQueryDto } from './busca.dto';
 
 @Controller('busca')
+@ApiTags('Busca')
+@ApiBearerAuth('JWT')
 export class BuscaController {
   constructor(private readonly busca: BuscaService) {}
 

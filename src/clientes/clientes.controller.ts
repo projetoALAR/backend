@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ClientesService } from './clientes.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
@@ -18,6 +19,8 @@ import type { AuditActor } from '../auditoria/auditoria.types';
 import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
 
 @Controller('clientes')
+@ApiTags('Clientes')
+@ApiBearerAuth('JWT')
 export class ClientesController {
   constructor(
     private readonly clientesService: ClientesService,
