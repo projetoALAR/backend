@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EquipeController } from './equipe.controller';
 import { EquipeService } from './equipe.service';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 describe('EquipeController', () => {
   let controller: EquipeController;
@@ -15,7 +16,13 @@ describe('EquipeController', () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [EquipeController],
-      providers: [{ provide: EquipeService, useValue: equipeService }],
+      providers: [
+        { provide: EquipeService, useValue: equipeService },
+        {
+          provide: AuditoriaService,
+          useValue: { registrar: jest.fn().mockResolvedValue(undefined) },
+        },
+      ],
     }).compile();
     controller = module.get(EquipeController);
   });
@@ -23,12 +30,15 @@ describe('EquipeController', () => {
   it('criar delega ao service', async () => {
     equipeService.criar.mockResolvedValue({ id: 'm1' });
     await expect(
-      controller.criar({
-        nome: 'Ana',
-        email: 'ana@alar.com.br',
-        cargo: 'Advogada',
-        senha: 'senha1234',
-      }),
+      controller.criar(
+        {
+          nome: 'Ana',
+          email: 'ana@alar.com.br',
+          cargo: 'Advogada',
+          senha: 'senha1234',
+        },
+        { id: 'admin' },
+      ),
     ).resolves.toEqual({ id: 'm1' });
   });
 
@@ -40,7 +50,9 @@ describe('EquipeController', () => {
   it('atualizar e remover usam o id', async () => {
     equipeService.atualizar.mockResolvedValue({ id: 'm1', nome: 'Ana' });
     equipeService.remover.mockResolvedValue({ id: 'm1' });
-    await expect(controller.atualizar('m1', { nome: 'Ana' })).resolves.toEqual({
+    await expect(
+      controller.atualizar('m1', { nome: 'Ana' }, { id: 'admin' }),
+    ).resolves.toEqual({
       id: 'm1',
       nome: 'Ana',
     });

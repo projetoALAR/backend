@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 import { Role } from './roles';
 
 describe('AuthController', () => {
@@ -18,7 +19,13 @@ describe('AuthController', () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: AuthService, useValue: authService }],
+      providers: [
+        { provide: AuthService, useValue: authService },
+        {
+          provide: AuditoriaService,
+          useValue: { registrar: jest.fn().mockResolvedValue(undefined) },
+        },
+      ],
     }).compile();
     controller = module.get(AuthController);
   });
@@ -64,15 +71,22 @@ describe('AuthController', () => {
 
   it('createUser e listUsers delegam (admin)', async () => {
     authService.listUsers.mockResolvedValue([]);
-    authService.createUserByAdmin.mockResolvedValue({ id: 'u2' });
+    authService.createUserByAdmin.mockResolvedValue({
+      user: { id: 'u2', nome: 'Bob', email: 'bob@alar.com.br' },
+    });
     await expect(controller.listUsers()).resolves.toEqual([]);
     await expect(
-      controller.createUser({
-        nome: 'Bob',
-        email: 'bob@alar.com.br',
-        senha: 'senha1234',
-        role: Role.ASSISTENTE,
-      }),
-    ).resolves.toEqual({ id: 'u2' });
+      controller.createUser(
+        {
+          nome: 'Bob',
+          email: 'bob@alar.com.br',
+          senha: 'senha1234',
+          role: Role.ASSISTENTE,
+        },
+        { id: 'admin', nome: 'Admin', email: 'admin@alar.com.br' },
+      ),
+    ).resolves.toEqual({
+      user: { id: 'u2', nome: 'Bob', email: 'bob@alar.com.br' },
+    });
   });
 });

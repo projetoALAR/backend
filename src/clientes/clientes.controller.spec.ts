@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ClientesController } from './clientes.controller';
 import { ClientesService } from './clientes.service';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 describe('ClientesController', () => {
   let controller: ClientesController;
@@ -17,6 +18,10 @@ describe('ClientesController', () => {
             atualizar: jest.fn(),
             remover: jest.fn(),
           },
+        },
+        {
+          provide: AuditoriaService,
+          useValue: { registrar: jest.fn().mockResolvedValue(undefined) },
         },
       ],
     }).compile();

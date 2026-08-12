@@ -11,16 +11,29 @@ import {
   RegisterDto,
   ChangePasswordDto,
 } from './auth.dto';
+import { AuditoriaService } from '../auditoria/auditoria.service';
+import type { AuditActor } from '../auditoria/auditoria.types';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
-  register(@Body() body: RegisterDto) {
-    return this.authService.register(body);
+  async register(@Body() body: RegisterDto) {
+    const result = await this.authService.register(body);
+    await this.auditoria.registrar({
+      acao: 'CRIAR',
+      entidade: 'USUARIO',
+      entidadeId: result.user.id,
+      resumo: `Usuário ${result.user.nome} (${result.user.email})`,
+      ator: result.user,
+    });
+    return result;
   }
 
   @Public()
@@ -64,7 +77,18 @@ export class AuthController {
 
   @Roles(Role.ADMIN)
   @Post('usuarios')
-  createUser(@Body() body: CreateUserDto) {
-    return this.authService.createUserByAdmin(body);
+  async createUser(
+    @Body() body: CreateUserDto,
+    @CurrentUser() ator: AuditActor,
+  ) {
+    const result = await this.authService.createUserByAdmin(body);
+    await this.auditoria.registrar({
+      acao: 'CRIAR',
+      entidade: 'USUARIO',
+      entidadeId: result.user.id,
+      resumo: `Usuário ${result.user.nome} (${result.user.email})`,
+      ator,
+    });
+    return result;
   }
 }

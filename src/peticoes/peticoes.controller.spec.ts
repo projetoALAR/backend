@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PeticoesController } from './peticoes.controller';
 import { PeticoesService } from './peticoes.service';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 describe('PeticoesController', () => {
   let controller: PeticoesController;
@@ -13,7 +14,13 @@ describe('PeticoesController', () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PeticoesController],
-      providers: [{ provide: PeticoesService, useValue: service }],
+      providers: [
+        { provide: PeticoesService, useValue: service },
+        {
+          provide: AuditoriaService,
+          useValue: { registrar: jest.fn().mockResolvedValue(undefined) },
+        },
+      ],
     }).compile();
 
     controller = module.get(PeticoesController);
@@ -32,13 +39,16 @@ describe('PeticoesController', () => {
   });
 
   it('salvar delega ao service', async () => {
-    service.salvarRascunho.mockResolvedValue({ id: 'd1' });
+    service.salvarRascunho.mockResolvedValue({ id: 'd1', nome: 'doc.pdf' });
     const dto = {
       processoId: 'p1',
       nomeArquivo: 'doc.pdf',
       texto: 'texto',
     };
-    await expect(controller.salvar(dto)).resolves.toEqual({ id: 'd1' });
+    await expect(controller.salvar(dto, { id: 'u1' })).resolves.toEqual({
+      id: 'd1',
+      nome: 'doc.pdf',
+    });
     expect(service.salvarRascunho).toHaveBeenCalledWith(dto);
   });
 });

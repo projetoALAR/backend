@@ -14,11 +14,17 @@ import { DocumentosService } from './documentos.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
 import { UploadDocumentoDto } from './documentos.dto';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuditoriaService } from '../auditoria/auditoria.service';
+import type { AuditActor } from '../auditoria/auditoria.types';
 import 'multer';
 
 @Controller('documentos')
 export class DocumentosController {
-  constructor(private readonly documentosService: DocumentosService) {}
+  constructor(
+    private readonly documentosService: DocumentosService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Post('upload')
@@ -26,8 +32,20 @@ export class DocumentosController {
   async upload(
     @UploadedFile() arquivo: Express.Multer.File,
     @Body() body: UploadDocumentoDto,
+    @CurrentUser() ator: AuditActor,
   ) {
-    return this.documentosService.fazerUpload(body.processoId, arquivo);
+    const doc = await this.documentosService.fazerUpload(
+      body.processoId,
+      arquivo,
+    );
+    await this.auditoria.registrar({
+      acao: 'CRIAR',
+      entidade: 'DOCUMENTO',
+      entidadeId: doc.id,
+      resumo: `Documento ${doc.nome}`,
+      ator,
+    });
+    return doc;
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
@@ -40,7 +58,18 @@ export class DocumentosController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Delete(':id')
-  async remover(@Param('id', ParseUUIDPipe) id: string) {
-    return this.documentosService.remover(id);
+  async remover(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() ator: AuditActor,
+  ) {
+    const doc = await this.documentosService.remover(id);
+    await this.auditoria.registrar({
+      acao: 'EXCLUIR',
+      entidade: 'DOCUMENTO',
+      entidadeId: doc.id,
+      resumo: `Documento ${doc.nome}`,
+      ator,
+    });
+    return doc;
   }
 }

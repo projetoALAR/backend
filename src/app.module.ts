@@ -21,6 +21,7 @@ import { NotificacoesModule } from './notificacoes/notificacoes.module';
 import { AndamentosModule } from './andamentos/andamentos.module';
 import { ModelosDocumentoModule } from './modelos-documento/modelos-documento.module';
 import { PeticoesModule } from './peticoes/peticoes.module';
+import { AuditoriaModule } from './auditoria/auditoria.module';
 import { PrismaService } from './prisma.service';
 import { RequestLoggingMiddleware } from './common/request-logging.middleware';
 
@@ -49,6 +50,7 @@ import { RequestLoggingMiddleware } from './common/request-logging.middleware';
     AndamentosModule,
     ModelosDocumentoModule,
     PeticoesModule,
+    AuditoriaModule,
   ],
   controllers: [AppController],
   providers: [

@@ -12,15 +12,34 @@ import { EquipeService } from './equipe.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
 import { CreateMembroDto, UpdateMembroDto } from './equipe.dto';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuditoriaService } from '../auditoria/auditoria.service';
+import type { AuditActor } from '../auditoria/auditoria.types';
 
 @Controller('equipe')
 export class EquipeController {
-  constructor(private readonly equipeService: EquipeService) {}
+  constructor(
+    private readonly equipeService: EquipeService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   @Roles(Role.ADMIN)
   @Post()
-  async criar(@Body() dados: CreateMembroDto) {
-    return this.equipeService.criar(dados);
+  async criar(
+    @Body() dados: CreateMembroDto,
+    @CurrentUser() ator: AuditActor,
+  ) {
+    const membro = await this.equipeService.criar(dados);
+    if (membro.usuarioId) {
+      await this.auditoria.registrar({
+        acao: 'CRIAR',
+        entidade: 'USUARIO',
+        entidadeId: membro.usuarioId,
+        resumo: `Usuário ${membro.nome} (${membro.email}) via equipe`,
+        ator,
+      });
+    }
+    return membro;
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
@@ -34,8 +53,19 @@ export class EquipeController {
   async atualizar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dados: UpdateMembroDto,
+    @CurrentUser() ator: AuditActor,
   ) {
-    return this.equipeService.atualizar(id, dados);
+    const membro = await this.equipeService.atualizar(id, dados);
+    if (membro.usuarioId) {
+      await this.auditoria.registrar({
+        acao: 'EDITAR',
+        entidade: 'USUARIO',
+        entidadeId: membro.usuarioId,
+        resumo: `Usuário ${membro.nome} (${membro.email}) via equipe`,
+        ator,
+      });
+    }
+    return membro;
   }
 
   @Roles(Role.ADMIN)

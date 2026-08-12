@@ -201,3 +201,21 @@ model Mensagem {
   conversacaoId String
   conversacao   Conversacao @relation(fields: [conversacaoId], references: [id], onDelete: Cascade)
 }
+
+/// Registro imutável de criar/editar/excluir (não apaga com o usuário).
+model AuditLog {
+  id           String   @id @default(uuid())
+  acao         String
+  entidade     String
+  entidadeId   String
+  resumo       String
+  usuarioId    String?
+  usuarioNome  String?
+  usuarioEmail String?
+  criadoEm     DateTime @default(now())
+
+  @@index([entidade, criadoEm])
+  @@index([usuarioId, criadoEm])
+  @@index([entidadeId])
+  @@index([criadoEm])
+}

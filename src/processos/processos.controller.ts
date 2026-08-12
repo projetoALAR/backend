@@ -12,15 +12,32 @@ import { ProcessosService } from './processos.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
 import { CreateProcessoDto, UpdateProcessoDto } from './processos.dto';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuditoriaService } from '../auditoria/auditoria.service';
+import type { AuditActor } from '../auditoria/auditoria.types';
 
 @Controller('processos')
 export class ProcessosController {
-  constructor(private readonly processosService: ProcessosService) {}
+  constructor(
+    private readonly processosService: ProcessosService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Post()
-  async criar(@Body() dados: CreateProcessoDto) {
-    return this.processosService.criar(dados);
+  async criar(
+    @Body() dados: CreateProcessoDto,
+    @CurrentUser() ator: AuditActor,
+  ) {
+    const processo = await this.processosService.criar(dados);
+    await this.auditoria.registrar({
+      acao: 'CRIAR',
+      entidade: 'PROCESSO',
+      entidadeId: processo.id,
+      resumo: `Caso ${processo.titulo || processo.numero}`,
+      ator,
+    });
+    return processo;
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
@@ -40,13 +57,33 @@ export class ProcessosController {
   async atualizar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dados: UpdateProcessoDto,
+    @CurrentUser() ator: AuditActor,
   ) {
-    return this.processosService.atualizar(id, dados);
+    const processo = await this.processosService.atualizar(id, dados);
+    await this.auditoria.registrar({
+      acao: 'EDITAR',
+      entidade: 'PROCESSO',
+      entidadeId: processo.id,
+      resumo: `Caso ${processo.titulo || processo.numero}`,
+      ator,
+    });
+    return processo;
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Delete(':id')
-  async remover(@Param('id', ParseUUIDPipe) id: string) {
-    return this.processosService.remover(id);
+  async remover(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() ator: AuditActor,
+  ) {
+    const processo = await this.processosService.remover(id);
+    await this.auditoria.registrar({
+      acao: 'EXCLUIR',
+      entidade: 'PROCESSO',
+      entidadeId: processo.id,
+      resumo: `Caso ${processo.titulo || processo.numero}`,
+      ator,
+    });
+    return processo;
   }
 }
