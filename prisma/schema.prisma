@@ -224,10 +224,14 @@ model Mensagem {
   conteudo      String
   isUser        Boolean
   fontes        Json?
+  tokensUsados  Int?
+  feedback      String?
   criadoEm      DateTime @default(now())
 
   conversacaoId String
   conversacao   Conversacao @relation(fields: [conversacaoId], references: [id], onDelete: Cascade)
+
+  @@index([conversacaoId, criadoEm])
 }
 
 /// Registro imutável de criar/editar/excluir (não apaga com o usuário).

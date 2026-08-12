@@ -16,6 +16,11 @@ const RESPOSTAS_MOCK = [
 const ERRO_LLM =
   'Não consegui obter resposta da IA agora. Verifique OPENAI_API_KEY, a conexão e tente novamente.';
 
+export type LlmResposta = {
+  content: string;
+  tokensUsados: number;
+};
+
 type ChatTextPart = { type: 'text'; text: string };
 type ChatImagePart = {
   type: 'image_url';
@@ -48,17 +53,22 @@ export class LlmService {
     return raw === 'true' || raw === '1' || raw === 'yes';
   }
 
-  private respostaMock(): string {
+  private estimarTokens(texto: string): number {
+    return Math.max(1, Math.ceil(texto.length / 4));
+  }
+
+  private respostaMock(): LlmResposta {
     const texto =
       RESPOSTAS_MOCK[Math.floor(Math.random() * RESPOSTAS_MOCK.length)];
-    return `[Modo demonstração] ${texto}`;
+    const content = `[Modo demonstração] ${texto}`;
+    return { content, tokensUsados: this.estimarTokens(content) };
   }
 
   async gerarRespostaJuridica(
     mensagemUsuario: string,
     historico: { role: 'user' | 'assistant'; content: string }[] = [],
     opcoes: LlmOpcoes | string = {},
-  ): Promise<string> {
+  ): Promise<LlmResposta> {
     const opts: LlmOpcoes =
       typeof opcoes === 'string' ? { contextoTexto: opcoes } : opcoes;
 
@@ -141,18 +151,26 @@ export class LlmService {
    * Reutilizável pela futura feature de geração de petições via IA.
    */
   async gerarTextoDocumento(prompt: string): Promise<string> {
+    const { content } = await this.gerarTextoDocumentoComTokens(prompt);
+    return content;
+  }
+
+  private async gerarTextoDocumentoComTokens(prompt: string): Promise<LlmResposta> {
     const apiKey = this.config.get<string>('OPENAI_API_KEY')?.trim();
     if (!apiKey) {
       if (this.isMockAllowed()) {
         this.logger.warn(
           'OPENAI_API_KEY ausente — CHAT_ALLOW_MOCK ativo (texto documento demonstração)',
         );
-        return [
-          '[CONTEÚDO FICTÍCIO GERADO PARA TESTE — não representa o processo real sob este número CNJ]',
-          '',
-          '[Modo demonstração] Texto jurídico genérico de simulação para fins de UI.',
-          'Trata-se de narrativa plausível e não de fatos reais sobre partes, valores ou decisões.',
-        ].join('\n');
+        return {
+          content: [
+            '[CONTEÚDO FICTÍCIO GERADO PARA TESTE — não representa o processo real sob este número CNJ]',
+            '',
+            '[Modo demonstração] Texto jurídico genérico de simulação para fins de UI.',
+            'Trata-se de narrativa plausível e não de fatos reais sobre partes, valores ou decisões.',
+          ].join('\n'),
+          tokensUsados: this.estimarTokens(prompt),
+        };
       }
       throw new ServiceUnavailableException(
         'Geração de documento IA indisponível: configure OPENAI_API_KEY ou defina CHAT_ALLOW_MOCK=true.',
@@ -187,7 +205,13 @@ export class LlmService {
     model: string,
     messages: ChatMessage[],
     opts: { temperature: number },
-  ): Promise<string> {
+  ): Promise<LlmResposta> {
+    const textoEntrada = messages
+      .map((m) =>
+        typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+      )
+      .join(' ');
+
     try {
       const response = await fetch(
         `${baseUrl.replace(/\/$/, '')}/chat/completions`,
@@ -208,21 +232,25 @@ export class LlmService {
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         this.logger.error(`LLM HTTP ${response.status}: ${errText}`);
-        return ERRO_LLM;
+        return { content: ERRO_LLM, tokensUsados: this.estimarTokens(textoEntrada) };
       }
 
       const data = (await response.json()) as {
         choices?: { message?: { content?: string } }[];
+        usage?: { total_tokens?: number };
       };
       const content = data.choices?.[0]?.message?.content?.trim();
       if (!content) {
         this.logger.warn('LLM retornou conteúdo vazio');
-        return ERRO_LLM;
+        return { content: ERRO_LLM, tokensUsados: this.estimarTokens(textoEntrada) };
       }
-      return content;
+      const tokensUsados =
+        data.usage?.total_tokens ??
+        this.estimarTokens(textoEntrada + content);
+      return { content, tokensUsados };
     } catch (error) {
       this.logger.error('Falha ao chamar LLM', error as Error);
-      return ERRO_LLM;
+      return { content: ERRO_LLM, tokensUsados: this.estimarTokens(textoEntrada) };
     }
   }
 }

@@ -29,6 +29,10 @@ describe('ChatService.enviarMensagem', () => {
     perguntaPedeArquivos: jest.fn(),
   };
 
+  const chatQuota = {
+    assertPodeUsar: jest.fn(),
+  };
+
   let service: ChatService;
 
   beforeEach(() => {
@@ -37,6 +41,7 @@ describe('ChatService.enviarMensagem', () => {
       prisma as unknown as PrismaService,
       llm as unknown as LlmService,
       chatContext as unknown as ChatContextService,
+      chatQuota as unknown as import('./chat-quota.service').ChatQuotaService,
     );
 
     prisma.conversacao.findUnique.mockResolvedValue({
@@ -70,7 +75,10 @@ describe('ChatService.enviarMensagem', () => {
 
   it('persiste resposta da IA em conversa de workspace', async () => {
     chatContext.montarContexto.mockResolvedValue('ctx');
-    llm.gerarRespostaJuridica.mockResolvedValue('resposta jurídica');
+    llm.gerarRespostaJuridica.mockResolvedValue({
+      content: 'resposta jurídica',
+      tokensUsados: 120,
+    });
     prisma.mensagem.create.mockResolvedValueOnce({
       id: 'msg-ia',
       conteudo: 'resposta jurídica',

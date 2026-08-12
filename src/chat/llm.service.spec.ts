@@ -27,7 +27,7 @@ describe('LlmService', () => {
   it('sem chave com CHAT_ALLOW_MOCK retorna demonstração explícita', async () => {
     const service = buildService({ CHAT_ALLOW_MOCK: 'true' });
     const resposta = await service.gerarRespostaJuridica('olá');
-    expect(resposta.startsWith('[Modo demonstração]')).toBe(true);
+    expect(resposta.content.startsWith('[Modo demonstração]')).toBe(true);
   });
 
   it('falha HTTP retorna erro explícito (não mock silencioso)', async () => {
@@ -41,8 +41,8 @@ describe('LlmService', () => {
     const resposta = await service.gerarRespostaJuridica('olá', [], {
       modo: 'workspace',
     });
-    expect(resposta).toMatch(/Não consegui obter resposta da IA/);
-    expect(resposta).not.toMatch(/\[Modo demonstração\]/);
+    expect(resposta.content).toMatch(/Não consegui obter resposta da IA/);
+    expect(resposta.content).not.toMatch(/\[Modo demonstração\]/);
   });
 
   describe('gerarTextoDocumento', () => {
@@ -72,6 +72,7 @@ describe('LlmService', () => {
               },
             },
           ],
+          usage: { total_tokens: 250 },
         }),
       });
 

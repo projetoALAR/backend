@@ -7,6 +7,8 @@ import { PrismaService } from '../prisma.service';
 import { LlmService } from './llm.service';
 import { ChatContextService } from './chat-context.service';
 import { filtrarFontesCitadas, type ChatFonte } from './chat-fonte.types';
+import { ChatQuotaService } from './chat-quota.service';
+import type { Role } from '../auth/roles';
 
 @Injectable()
 export class ChatService {
@@ -14,6 +16,7 @@ export class ChatService {
     private prisma: PrismaService,
     private llm: LlmService,
     private chatContext: ChatContextService,
+    private chatQuota: ChatQuotaService,
   ) {}
 
   private async assertDonoGeral(id: string, usuarioId: string) {
@@ -124,8 +127,11 @@ export class ChatService {
     conversacaoId: string,
     conteudo: string,
     usuarioId: string,
+    role?: Role,
   ) {
     const conversa = await this.assertAcessoMensagem(conversacaoId, usuarioId);
+
+    await this.chatQuota.assertPodeUsar(usuarioId, role);
 
     const mensagemUsuario = await this.prisma.mensagem.create({
       data: {
@@ -141,6 +147,7 @@ export class ChatService {
     }));
 
     let resposta: string;
+    let tokensUsados = 0;
     let fontesResposta: ChatFonte[] = [];
     try {
       if (conversa.processoId) {
@@ -149,21 +156,25 @@ export class ChatService {
           conteudo,
         );
         const pedeArquivos = this.chatContext.perguntaPedeArquivos(conteudo);
-        resposta = await this.llm.gerarRespostaJuridica(conteudo, historico, {
+        const llmRes = await this.llm.gerarRespostaJuridica(conteudo, historico, {
           modo: 'caso',
           contextoTexto: caso.textoContexto,
           imagensUrls: caso.imagensUrls,
           detalheImagem: pedeArquivos ? 'high' : 'auto',
         });
+        resposta = llmRes.content;
+        tokensUsados = llmRes.tokensUsados;
         fontesResposta = filtrarFontesCitadas(resposta, caso.fontes);
       } else {
         const contextoProjeto = await this.chatContext.montarContexto({
           pergunta: conteudo,
         });
-        resposta = await this.llm.gerarRespostaJuridica(conteudo, historico, {
+        const llmRes = await this.llm.gerarRespostaJuridica(conteudo, historico, {
           modo: 'workspace',
           contextoTexto: contextoProjeto,
         });
+        resposta = llmRes.content;
+        tokensUsados = llmRes.tokensUsados;
       }
     } catch (error) {
       // Sem mock/chave: remove a mensagem do usuário para o front poder restaurar o input
@@ -176,6 +187,7 @@ export class ChatService {
         conversacaoId,
         conteudo: resposta,
         isUser: false,
+        tokensUsados,
         fontes:
           fontesResposta.length > 0
             ? (fontesResposta as object[])
@@ -205,5 +217,21 @@ export class ChatService {
   async removerConversa(id: string, usuarioId: string) {
     await this.assertDonoGeral(id, usuarioId);
     return this.prisma.conversacao.delete({ where: { id } });
+  }
+
+  obterQuota(usuarioId: string, role?: Role) {
+    return this.chatQuota.resumo(usuarioId, role);
+  }
+
+  registrarFeedback(
+    mensagemId: string,
+    usuarioId: string,
+    util: boolean,
+  ) {
+    return this.chatQuota.registrarFeedback(mensagemId, usuarioId, util);
+  }
+
+  metricasAdmin() {
+    return this.chatQuota.metricasAdmin();
   }
 }

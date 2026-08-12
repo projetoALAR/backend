@@ -10,6 +10,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
+import { MensagemFeedbackDto } from './chat.dto';
 import { CreateConversaDto, EnviarMensagemDto } from '../common/common.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
@@ -28,6 +29,17 @@ export class ChatController {
     private readonly chatService: ChatService,
     private readonly casoAcesso: CasoAcessoService,
   ) {}
+
+  @Get('quota')
+  obterQuota(@CurrentUser() user: AuthUser) {
+    return this.chatService.obterQuota(user.id, user.role);
+  }
+
+  @Roles(Role.ADMIN)
+  @Get('metricas')
+  metricasAdmin() {
+    return this.chatService.metricasAdmin();
+  }
 
   @Get('conversas')
   async listarConversas(@CurrentUser() user: AuthUser) {
@@ -66,7 +78,16 @@ export class ChatController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: EnviarMensagemDto,
   ) {
-    return this.chatService.enviarMensagem(id, body.conteudo, user.id);
+    return this.chatService.enviarMensagem(id, body.conteudo, user.id, user.role);
+  }
+
+  @Post('mensagens/:id/feedback')
+  registrarFeedback(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: MensagemFeedbackDto,
+  ) {
+    return this.chatService.registrarFeedback(id, user.id, body.util);
   }
 
   @Delete('conversas/:id')
