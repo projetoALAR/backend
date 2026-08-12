@@ -131,3 +131,10 @@ export class UpdateProcessoDto {
   @IsUUID()
   coResponsavelId?: string | null;
 }
+
+export class CreateProcessoComentarioDto {
+  @IsString()
+  @MinLength(1, { message: 'Comentário obrigatório' })
+  @MaxLength(2000)
+  texto!: string;
+}

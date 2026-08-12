@@ -11,9 +11,10 @@ import {
 import { ProcessosService } from './processos.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
-import { CreateProcessoDto, UpdateProcessoDto } from './processos.dto';
+import { CreateProcessoDto, UpdateProcessoDto, CreateProcessoComentarioDto } from './processos.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { ProcessosTimelineService } from './processos-timeline.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
 import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
 
@@ -22,6 +23,7 @@ export class ProcessosController {
   constructor(
     private readonly processosService: ProcessosService,
     private readonly auditoria: AuditoriaService,
+    private readonly timeline: ProcessosTimelineService,
   ) {}
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
@@ -54,6 +56,25 @@ export class ProcessosController {
   @Get()
   async listarTodos(@CurrentUser() user: CasoAcessoUser) {
     return this.processosService.listarTodos(user);
+  }
+
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
+  @Get(':id/timeline')
+  async timelineDoProcesso(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: CasoAcessoUser,
+  ) {
+    return this.timeline.listar(id, user);
+  }
+
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
+  @Post(':id/comentarios')
+  async comentarProcesso(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dados: CreateProcessoComentarioDto,
+    @CurrentUser() user: CasoAcessoUser,
+  ) {
+    return this.timeline.comentar(id, user, dados.texto);
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)

@@ -44,6 +44,7 @@ model Processo {
   documentos   Documento[]
   conversas    Conversacao[]
   andamentos   Andamento[]
+  comentarios  ProcessoComentario[]
 
   @@index([clienteId])
   @@index([concluido])
@@ -66,6 +67,18 @@ model Andamento {
   criadoEm        DateTime @default(now())
 
   @@index([processoId, data])
+}
+
+model ProcessoComentario {
+  id         String   @id @default(uuid())
+  processoId String
+  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  usuarioId  String
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  texto      String
+  criadoEm   DateTime @default(now())
+
+  @@index([processoId, criadoEm])
 }
 
 model Compromisso {
@@ -146,6 +159,7 @@ model Usuario {
   membroEquipe MembroEquipe?
   processosComoResponsavel   Processo[] @relation("ProcessoResponsavel")
   processosComoCoResponsavel Processo[] @relation("ProcessoCoResponsavel")
+  comentariosProcesso        ProcessoComentario[]
 }
 
 model Preferencia {
