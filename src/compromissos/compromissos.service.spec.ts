@@ -33,4 +33,21 @@ describe('CompromissosService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  it('lista compromissos do caso depois de checar acesso', async () => {
+    const prisma = (service as unknown as { prisma: { compromisso: { findMany: jest.Mock } } })
+      .prisma;
+    const casoAcesso = (
+      service as unknown as { casoAcesso: { assertPodeVer: jest.Mock } }
+    ).casoAcesso;
+    prisma.compromisso = { findMany: jest.fn().mockResolvedValue([]) };
+    const user = { id: 'u1', role: 'ADVOGADO' };
+    await expect(service.listarPorProcesso('p1', user as never)).resolves.toEqual(
+      [],
+    );
+    expect(casoAcesso.assertPodeVer).toHaveBeenCalledWith(user, 'p1');
+    expect(prisma.compromisso.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { processoId: 'p1' } }),
+    );
+  });
 });

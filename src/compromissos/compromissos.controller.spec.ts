@@ -14,6 +14,7 @@ describe('CompromissosController', () => {
           useValue: {
             criar: jest.fn(),
             listarTodos: jest.fn(),
+            listarPorProcesso: jest.fn(),
             atualizar: jest.fn(),
             remover: jest.fn(),
           },

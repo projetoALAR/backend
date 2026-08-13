@@ -35,6 +35,15 @@ export class CompromissosController {
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
+  @Get('processo/:processoId')
+  async listarPorProcesso(
+    @Param('processoId', ParseUUIDPipe) processoId: string,
+    @CurrentUser() user: CasoAcessoUser,
+  ) {
+    return this.compromissosService.listarPorProcesso(processoId, user);
+  }
+
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Put(':id')
   async atualizar(
     @Param('id', ParseUUIDPipe) id: string,

@@ -55,6 +55,14 @@ export class CompromissosService {
     });
   }
 
+  async listarPorProcesso(processoId: string, user: CasoAcessoUser) {
+    await this.casoAcesso.assertPodeVer(user, processoId);
+    return this.prisma.compromisso.findMany({
+      where: { processoId },
+      orderBy: { dataHora: 'asc' },
+    });
+  }
+
   async atualizar(id: string, dados: UpdateCompromissoDto, user: CasoAcessoUser) {
     const atual = await this.prisma.compromisso.findUnique({ where: { id } });
     if (atual?.processoId) {
