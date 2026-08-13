@@ -70,6 +70,16 @@ export class ClientesController {
     return payload;
   }
 
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
+  @Get(':id')
+  @ApiOkResponse({ type: ClienteRespostaDto })
+  async buscarPorId(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: CasoAcessoUser,
+  ) {
+    return this.clientesService.buscarPorId(id, user);
+  }
+
   @Roles(Role.ADMIN)
   @Post(':id/anonimizar')
   @ApiOkResponse({ type: ClienteRespostaDto })

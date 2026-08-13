@@ -19,11 +19,11 @@ describe('montarEmailAlar', () => {
     const { html } = montarEmailAlar({
       titulo: 'Novo andamento',
       corpo: 'Confira o processo.',
-      link: '/tasks/abc',
+      link: '/casos/abc',
       appUrl: 'https://app.alar.com.br',
     });
 
-    expect(html).toContain('https://app.alar.com.br/tasks/abc');
+    expect(html).toContain('https://app.alar.com.br/casos/abc');
   });
 
   it('escapa HTML no corpo', () => {

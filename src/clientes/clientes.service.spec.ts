@@ -8,6 +8,7 @@ describe('ClientesService', () => {
   const prisma = {
     cliente: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       create: jest.fn(),
       findMany: jest.fn(),
@@ -68,6 +69,28 @@ describe('ClientesService', () => {
     await expect(service.criar({ nome: 'Ana', cpf: '123' })).rejects.toThrow(
       'CPF deve ter 11 dígitos',
     );
+  });
+
+  it('buscarPorId devolve o cliente visível', async () => {
+    prisma.cliente.findFirst.mockResolvedValue({
+      id: 'c1',
+      nome: 'Ana',
+      _count: { processos: 2 },
+    });
+    await expect(
+      service.buscarPorId('c1', { id: 'u1', role: 'ADVOGADO' } as never),
+    ).resolves.toEqual({
+      id: 'c1',
+      nome: 'Ana',
+      _count: { processos: 2 },
+    });
+  });
+
+  it('buscarPorId lança 404 se o cliente não existe', async () => {
+    prisma.cliente.findFirst.mockResolvedValue(null);
+    await expect(
+      service.buscarPorId('c1', { id: 'u1', role: 'ADVOGADO' } as never),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('exportar lança 404 se o cliente não existe', async () => {

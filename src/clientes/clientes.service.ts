@@ -61,6 +61,19 @@ export class ClientesService {
     });
   }
 
+  async buscarPorId(id: string, user: CasoAcessoUser) {
+    const cliente = await this.prisma.cliente.findFirst({
+      where: { id, ...this.casoAcesso.visibilidadeCliente(user) },
+      include: {
+        _count: { select: { processos: true } },
+      },
+    });
+    if (!cliente) {
+      throw new NotFoundException('Cliente não encontrado');
+    }
+    return cliente;
+  }
+
   async atualizar(id: string, dados: UpdateClienteDto) {
     const atual = await this.prisma.cliente.findUnique({ where: { id } });
     if (!atual) {

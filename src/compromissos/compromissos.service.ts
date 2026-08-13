@@ -36,7 +36,7 @@ export class CompromissosService {
     await this.notificacoes.notificarTodosUsuarios(
       'Novo compromisso',
       `${compromisso.titulo} em ${quando}`,
-      '/calendar',
+      '/agenda',
       'reminders',
     );
 

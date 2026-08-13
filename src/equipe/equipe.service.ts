@@ -127,7 +127,7 @@ export class EquipeService {
     await this.notificacoes.notificarTodosUsuarios(
       'Novo membro na equipe',
       `${membro.nome} (${membro.cargo}) foi adicionado à equipe.`,
-      '/team',
+      '/equipe',
       'teamUpdates',
     );
 

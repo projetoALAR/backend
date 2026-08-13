@@ -116,7 +116,7 @@ export class PrazosReminderService {
       const corpo = `${compromisso.titulo} — ${quando}.`;
       const link = compromisso.processoId
         ? `/casos/${compromisso.processoId}`
-        : '/calendar';
+        : '/agenda';
       const destinatarios = compromisso.processo
         ? await this.resolverDestinatarios(
             compromisso.processo.responsavelId,

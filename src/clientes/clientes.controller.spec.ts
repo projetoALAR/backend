@@ -15,6 +15,7 @@ describe('ClientesController', () => {
           useValue: {
             criar: jest.fn(),
             listarTodos: jest.fn(),
+            buscarPorId: jest.fn(),
             atualizar: jest.fn(),
             remover: jest.fn(),
             exportar: jest.fn(),

@@ -98,7 +98,7 @@ export class BuscaService {
         tipo: 'CLIENTE' as const,
         titulo: c.nome,
         subtitulo: c.tipo === 'PJ' ? c.cnpj : c.cpf,
-        href: `/clients?q=${encodeURIComponent(c.nome)}`,
+        href: `/clientes/${c.id}`,
       })),
       ...processos.map((p) => ({
         id: p.id,
