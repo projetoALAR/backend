@@ -7,6 +7,9 @@ FROM node:20-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# prisma.config.ts exige DIRECT_URL no generate (não usa o banco de verdade)
+ENV DIRECT_URL="postgresql://alar:alar@db:5432/alar"
+ENV DATABASE_URL="postgresql://alar:alar@db:5432/alar"
 RUN npx prisma generate && npm run build
 
 FROM node:20-alpine AS runner

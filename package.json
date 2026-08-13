@@ -98,9 +98,30 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "auth/**/*.ts",
+      "processos/**/*.ts",
+      "chat/**/*.ts",
+      "documentos/**/*.ts",
+      "clientes/**/*.ts",
+      "casos-acesso/**/*.ts",
+      "!**/*.spec.ts",
+      "!**/*.module.ts",
+      "!**/*.dto.ts",
+      "!**/*.types.ts"
     ],
     "coverageDirectory": "../coverage",
+    "coverageReporters": [
+      "text-summary",
+      "lcov"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 60,
+        "lines": 60,
+        "branches": 50,
+        "functions": 55
+      }
+    },
     "testEnvironment": "node"
   },
   "allowScripts": {

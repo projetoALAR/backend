@@ -25,17 +25,16 @@ type PreferenciaUpdateBody = {
 @Injectable()
 export class PreferenciasService {
   private readonly logger = new Logger(PreferenciasService.name);
-  private readonly supabase: SupabaseClient;
+  private readonly supabase: SupabaseClient | null;
 
   constructor(
     private prisma: PrismaService,
     private documentos: DocumentosService,
     config: ConfigService,
   ) {
-    this.supabase = createClient(
-      config.get<string>('SUPABASE_URL') || '',
-      config.get<string>('SUPABASE_KEY') || '',
-    );
+    const url = (config.get<string>('SUPABASE_URL') || '').trim();
+    const key = (config.get<string>('SUPABASE_KEY') || '').trim();
+    this.supabase = url && key ? createClient(url, key) : null;
   }
 
   private async withSignedFoto<T extends { fotoUrl: string | null }>(
@@ -132,6 +131,12 @@ export class PreferenciasService {
     // Path no bucket privado; URL assinada só na leitura (como documentos)
     const safeName = arquivo.originalname.replace(/[^\w.-]+/g, '_');
     const storagePath = `avatars/${userId}/${Date.now()}-${safeName}`;
+
+    if (!this.supabase) {
+      throw new InternalServerErrorException(
+        'Storage (Supabase) não configurado.',
+      );
+    }
 
     const { error: uploadError } = await this.supabase.storage
       .from(BUCKET)

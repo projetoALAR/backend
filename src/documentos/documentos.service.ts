@@ -45,19 +45,37 @@ function renderizarPdfDeTexto(texto: string): Promise<Buffer> {
   });
 }
 
+function criarClienteStorage(config: ConfigService): SupabaseClient | null {
+  const url = (config.get<string>('SUPABASE_URL') || '').trim();
+  const key = (config.get<string>('SUPABASE_KEY') || '').trim();
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
+
 @Injectable()
 export class DocumentosService {
   private readonly logger = new Logger(DocumentosService.name);
-  private readonly supabase: SupabaseClient;
+  private readonly supabase: SupabaseClient | null;
 
   constructor(
     private prisma: PrismaService,
     config: ConfigService,
   ) {
-    this.supabase = createClient(
-      config.get<string>('SUPABASE_URL') || '',
-      config.get<string>('SUPABASE_KEY') || '',
-    );
+    this.supabase = criarClienteStorage(config);
+    if (!this.supabase) {
+      this.logger.warn(
+        'SUPABASE_URL/KEY ausentes — upload e URLs assinadas ficam indisponíveis',
+      );
+    }
+  }
+
+  private exigirStorage(): SupabaseClient {
+    if (!this.supabase) {
+      throw new InternalServerErrorException(
+        'Storage (Supabase) não configurado.',
+      );
+    }
+    return this.supabase;
   }
 
   /** Extrai path no bucket a partir de path puro ou URL pública antiga. */
@@ -80,6 +98,9 @@ export class DocumentosService {
 
   /** URL temporária assinada para download/visão (bucket privado). */
   async resolveSignedUrl(urlOrPath: string): Promise<string> {
+    if (!this.supabase) {
+      return urlOrPath.includes('://') ? urlOrPath : '';
+    }
     const path = this.extractStoragePath(urlOrPath);
     const { data, error } = await this.supabase.storage
       .from(BUCKET)
@@ -140,8 +161,8 @@ export class DocumentosService {
     const safeName = arquivo.originalname.replace(/[^\w.-]+/g, '_');
     const storagePath = `${processoId}/${Date.now()}-${safeName}`;
 
-    const { error: uploadError } = await this.supabase.storage
-      .from(BUCKET)
+    const { error: uploadError } = await this.exigirStorage()
+      .storage.from(BUCKET)
       .upload(storagePath, arquivo.buffer, {
         contentType: arquivo.mimetype,
         upsert: false,
@@ -200,8 +221,8 @@ export class DocumentosService {
     const storagePath = `${processoId}/${Date.now()}-${safeName}`;
     const pdfBuffer = await renderizarPdfDeTexto(conteudoTexto);
 
-    const { error: uploadError } = await this.supabase.storage
-      .from(BUCKET)
+    const { error: uploadError } = await this.exigirStorage()
+      .storage.from(BUCKET)
       .upload(storagePath, pdfBuffer, {
         contentType: 'application/pdf',
         upsert: false,
@@ -242,7 +263,9 @@ export class DocumentosService {
 
     const storagePath = this.extractStoragePath(documento.urlArquivo);
     try {
-      await this.supabase.storage.from(BUCKET).remove([storagePath]);
+      if (this.supabase) {
+        await this.supabase.storage.from(BUCKET).remove([storagePath]);
+      }
     } catch (err) {
       this.logger.warn(
         `Falha ao remover do Storage (${storagePath}): ${String(err)}`,

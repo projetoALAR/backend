@@ -56,8 +56,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Unit tests
-        run: npm test -- --passWithNoTests
+      - name: Unit tests + coverage (core ≥ 60%)
+        run: npm run test:cov
 
       - name: Apply migrations
         run: npx prisma migrate deploy
