@@ -20,6 +20,7 @@ describe('ProcessosService', () => {
   const notificacoes = { notificarTodosUsuarios: jest.fn() };
   const casoAcesso = {
     visibilidadeProcesso: jest.fn().mockReturnValue({}),
+    assertPodeVer: jest.fn().mockResolvedValue(undefined),
   };
   let service: ProcessosService;
   const user = { id: 'u1', role: Role.ADVOGADO };
@@ -84,6 +85,13 @@ describe('ProcessosService', () => {
         responsavelId: 'ghost',
       } satisfies CreateProcessoDto),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('busca caso por id com RBAC', async () => {
+    const processo = { id: 'p1', titulo: 'Caso' };
+    prisma.processo.findUnique.mockResolvedValue(processo);
+    await expect(service.buscarPorId('p1', user)).resolves.toEqual(processo);
+    expect(casoAcesso.assertPodeVer).toHaveBeenCalledWith(user, 'p1');
   });
 
   it('lista por cliente e todos usando visibilidade', async () => {

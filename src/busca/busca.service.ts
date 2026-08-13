@@ -105,7 +105,7 @@ export class BuscaService {
         tipo: 'PROCESSO' as const,
         titulo: p.titulo || p.numero,
         subtitulo: `${p.numero}${p.cliente?.nome ? ` · ${p.cliente.nome}` : ''}`,
-        href: `/tasks?caseId=${p.id}`,
+        href: `/casos/${p.id}`,
       })),
     ];
 

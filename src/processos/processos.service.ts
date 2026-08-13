@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
@@ -69,7 +69,7 @@ export class ProcessosService {
       await this.notificacoes.notificarTodosUsuarios(
         'Novo caso com prazo',
         `${processo.titulo || processo.numero} — prazo ${quando}`,
-        `/tasks?caseId=${processo.id}`,
+        `/casos/${processo.id}`,
         'reminders',
       );
     }
@@ -97,6 +97,21 @@ export class ProcessosService {
       },
       orderBy: { criadoEm: 'desc' },
     });
+  }
+
+  async buscarPorId(id: string, user: CasoAcessoUser) {
+    await this.casoAcesso.assertPodeVer(user, id);
+    const processo = await this.prisma.processo.findUnique({
+      where: { id },
+      include: {
+        ...processoInclude,
+        _count: { select: { documentos: true, compromissos: true } },
+      },
+    });
+    if (!processo) {
+      throw new NotFoundException('Processo não encontrado');
+    }
+    return processo;
   }
 
   async atualizar(id: string, dados: UpdateProcessoDto) {

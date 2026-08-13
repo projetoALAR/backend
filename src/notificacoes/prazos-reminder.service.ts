@@ -65,7 +65,7 @@ export class PrazosReminderService {
       const quando = processo.prazo.toLocaleDateString('pt-BR');
       const assunto = `Prazo ${rotuloJanela(dias)}: ${tituloCaso}`;
       const corpo = `O caso ${tituloCaso} vence ${rotuloJanela(dias)} (${quando}).`;
-      const link = `/tasks?caseId=${processo.id}`;
+      const link = `/casos/${processo.id}`;
       const destinatarios = await this.resolverDestinatarios(
         processo.responsavelId,
         processo.coResponsavelId,
@@ -115,7 +115,7 @@ export class PrazosReminderService {
       const assunto = `Compromisso ${rotuloJanela(dias)}: ${compromisso.titulo}`;
       const corpo = `${compromisso.titulo} — ${quando}.`;
       const link = compromisso.processoId
-        ? `/tasks?caseId=${compromisso.processoId}`
+        ? `/casos/${compromisso.processoId}`
         : '/calendar';
       const destinatarios = compromisso.processo
         ? await this.resolverDestinatarios(

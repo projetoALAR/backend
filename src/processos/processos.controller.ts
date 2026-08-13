@@ -66,6 +66,16 @@ export class ProcessosController {
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
+  @Get(':id')
+  @ApiOkResponse({ type: ProcessoRespostaDto })
+  async buscarPorId(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: CasoAcessoUser,
+  ) {
+    return this.processosService.buscarPorId(id, user);
+  }
+
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get(':id/timeline')
   async timelineDoProcesso(
     @Param('id', ParseUUIDPipe) id: string,

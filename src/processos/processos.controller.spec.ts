@@ -11,6 +11,7 @@ describe('ProcessosController', () => {
     criar: jest.fn(),
     listarTodos: jest.fn(),
     listarPorCliente: jest.fn(),
+    buscarPorId: jest.fn(),
     atualizar: jest.fn(),
     remover: jest.fn(),
   };
@@ -50,11 +51,14 @@ describe('ProcessosController', () => {
     );
   });
 
-  it('lista por cliente e todos', async () => {
+  it('lista por cliente, todos e por id', async () => {
+    const processo = { id: 'p1', titulo: 'Caso', numero: '1' };
     processosService.listarPorCliente.mockResolvedValue([]);
     processosService.listarTodos.mockResolvedValue([]);
+    processosService.buscarPorId.mockResolvedValue(processo);
     await expect(controller.listarPorCliente('c1', ator)).resolves.toEqual([]);
     await expect(controller.listarTodos(ator)).resolves.toEqual([]);
+    await expect(controller.buscarPorId('p1', ator)).resolves.toEqual(processo);
   });
 
   it('delega timeline e comentário', async () => {

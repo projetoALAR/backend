@@ -124,6 +124,14 @@ describe('Fluxo crítico (e2e)', () => {
     expect(tarefaRes.body.titulo).toContain('Checklist E2E');
 
     await request(app.getHttpServer())
+      .get(`/v1/processos/${processoId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.id).toBe(processoId);
+      });
+
+    await request(app.getHttpServer())
       .get(`/v1/processos/${processoId}/tarefas`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200)

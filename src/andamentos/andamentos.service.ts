@@ -120,7 +120,7 @@ export class AndamentosService {
       await this.notificacoes.notificarTodosUsuarios(
         'Novo andamento processual',
         `${processo.titulo || processo.numero}: ${mov.descricao} (${quando})`,
-        `/tasks?caseId=${processo.id}`,
+        `/casos/${processo.id}`,
         'reminders',
         'andamento',
       );

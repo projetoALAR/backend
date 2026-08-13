@@ -133,7 +133,7 @@ describe('AndamentosService', () => {
     expect(notificacoes.notificarTodosUsuarios).toHaveBeenCalledWith(
       'Novo andamento processual',
       expect.stringContaining('Juntada de petição'),
-      '/tasks?caseId=proc-1',
+      '/casos/proc-1',
       'reminders',
       'andamento',
     );
