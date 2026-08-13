@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { configurarHttpApp } from './../src/app.setup';
+import { criarDocumentoOpenApi } from './../src/swagger';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -13,13 +15,7 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+    configurarHttpApp(app);
     await app.init();
   });
 
@@ -43,9 +39,28 @@ describe('AppController (e2e)', () => {
 
   it('/auth/login rejeita payload inválido', () => {
     return request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/v1/auth/login')
       .send({ email: 'nao-email', senha: '' })
       .expect(400);
+  });
+
+  it('/auth/login sem versão não existe', () => {
+    return request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'a@b.com', senha: 'x' })
+      .expect(404);
+  });
+
+  it('/v1/health não existe (health fica sem versão)', () => {
+    return request(app.getHttpServer()).get('/v1/health').expect(404);
+  });
+
+  it('OpenAPI lista rotas /v1 e health sem versão', () => {
+    const doc = criarDocumentoOpenApi(app);
+    expect(doc.paths['/v1/auth/login']).toBeDefined();
+    expect(doc.paths['/auth/login']).toBeUndefined();
+    expect(doc.paths['/health']).toBeDefined();
+    expect(doc.paths['/']).toBeDefined();
   });
 
   afterEach(async () => {

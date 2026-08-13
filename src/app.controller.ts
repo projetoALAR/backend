@@ -3,6 +3,7 @@ import {
   Get,
   NotFoundException,
   ServiceUnavailableException,
+  VERSION_NEUTRAL,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import * as Sentry from '@sentry/nestjs';
@@ -10,7 +11,7 @@ import { AppService } from './app.service';
 import { Public } from './auth/public.decorator';
 import { PrismaService } from './prisma.service';
 
-@Controller()
+@Controller({ version: VERSION_NEUTRAL })
 @ApiTags('Sistema')
 export class AppController {
   constructor(

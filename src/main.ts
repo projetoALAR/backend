@@ -1,9 +1,10 @@
 import './instrument';
 
 import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { configurarHttpApp } from './app.setup';
 import { configurarSwagger, swaggerHabilitado } from './swagger';
 
 function parseCorsOrigins(): string[] | boolean {
@@ -31,14 +32,7 @@ async function bootstrap() {
         : undefined,
     ),
   );
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
+  configurarHttpApp(app);
 
   const origins = parseCorsOrigins();
   if (origins === false) {

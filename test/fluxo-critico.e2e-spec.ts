@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { configurarHttpApp } from './../src/app.setup';
 
 /**
  * Fluxo crítico: login → cliente → caso → chat.
@@ -37,13 +38,7 @@ describe('Fluxo crítico (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+    configurarHttpApp(app);
     await app.init();
   });
 
@@ -58,7 +53,7 @@ describe('Fluxo crítico (e2e)', () => {
 
   it('login admin', async () => {
     const res = await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/v1/auth/login')
       .send({ email: adminEmail, senha: adminPassword });
 
     expect([200, 201]).toContain(res.status);
@@ -75,7 +70,7 @@ describe('Fluxo crítico (e2e)', () => {
     expect(token).toBeTruthy();
 
     const clienteRes = await request(app.getHttpServer())
-      .post('/clientes')
+      .post('/v1/clientes')
       .set('Authorization', `Bearer ${token}`)
       .send({
         nome: `Cliente E2E ${suffix}`,
@@ -88,7 +83,7 @@ describe('Fluxo crítico (e2e)', () => {
     expect(clienteId).toBeTruthy();
 
     const processoRes = await request(app.getHttpServer())
-      .post('/processos')
+      .post('/v1/processos')
       .set('Authorization', `Bearer ${token}`)
       .send({
         numero: `E2E-${suffix}`,
@@ -102,7 +97,7 @@ describe('Fluxo crítico (e2e)', () => {
     expect(processoId).toBeTruthy();
 
     const conversaRes = await request(app.getHttpServer())
-      .get(`/chat/conversas/processo/${processoId}`)
+      .get(`/v1/chat/conversas/processo/${processoId}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
@@ -110,7 +105,7 @@ describe('Fluxo crítico (e2e)', () => {
     expect(conversacaoId).toBeTruthy();
 
     const msgRes = await request(app.getHttpServer())
-      .post(`/chat/conversas/${conversacaoId}/mensagens`)
+      .post(`/v1/chat/conversas/${conversacaoId}/mensagens`)
       .set('Authorization', `Bearer ${token}`)
       .send({ conteudo: 'Resumo rápido do caso para teste e2e' });
 
@@ -122,7 +117,7 @@ describe('Fluxo crítico (e2e)', () => {
 
     // Upload: exige Supabase — valida que a rota está autenticada
     const uploadRes = await request(app.getHttpServer())
-      .post('/documentos/upload')
+      .post('/v1/documentos/upload')
       .set('Authorization', `Bearer ${token}`)
       .field('processoId', processoId)
       .attach('arquivo', Buffer.from('conteudo e2e'), {

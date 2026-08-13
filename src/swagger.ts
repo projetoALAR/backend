@@ -11,7 +11,7 @@ export function criarDocumentoOpenApi(app: INestApplication) {
   const config = new DocumentBuilder()
     .setTitle('Alar API')
     .setDescription(
-      'API REST do Alar — gestão jurídica (clientes, casos, documentos, chat IA, busca global).',
+      'API REST do Alar — gestão jurídica (clientes, casos, documentos, chat IA, busca global). Rotas de negócio em /v1. Health em /health.',
     )
     .setVersion('1.0')
     .addBearerAuth(

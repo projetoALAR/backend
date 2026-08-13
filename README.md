@@ -39,13 +39,13 @@ Variáveis de ambiente do backend (veja também `.env.example`):
 - `AUTH_ADMIN_EMAIL` — e-mail do admin criado no primeiro boot (padrão: `admin@alar.com.br`)
 - `AUTH_ADMIN_PASSWORD` — senha do admin (**mínimo 8 caracteres**; sem ela o admin não é criado)
 - `AUTH_ADMIN_NOME` — nome do admin (padrão: `Administrador`)
-- `AUTH_ALLOW_PUBLIC_REGISTER` — `true` libera `POST /auth/register` (padrão: `false`)
+- `AUTH_ALLOW_PUBLIC_REGISTER` — `true` libera `POST /v1/auth/register` (padrão: `false`)
 
 ### Papéis
 
 | Papel | Permissões |
 |-------|------------|
-| `ADMIN` | Acesso total, gestão de equipe e criação de usuários (`POST /auth/usuarios`) |
+| `ADMIN` | Acesso total, gestão de equipe e criação de usuários (`POST /v1/auth/usuarios`) |
 | `ADVOGADO` | CRUD de clientes/processos/documentos; leitura de equipe |
 | `ASSISTENTE` | Leitura geral; upload de documentos e compromissos; sem exclusão crítica |
 
@@ -53,9 +53,9 @@ Variáveis de ambiente do backend (veja também `.env.example`):
 
 No primeiro start, se a tabela `Usuario` estiver vazia **e** `AUTH_ADMIN_PASSWORD` estiver definida, o admin é criado com papel `ADMIN`.
 
-Endpoints públicos: `POST /auth/login`, `POST /auth/register` (se liberado), `GET /`. Demais rotas exigem `Authorization: Bearer <token>`.
+Endpoints públicos: `POST /v1/auth/login`, `POST /v1/auth/register` (se liberado), `GET /`, `GET /health`. Rotas de negócio ficam em `/v1`. Demais rotas exigem `Authorization: Bearer <token>`.
 
-Troca de senha: `POST /auth/change-password` com `{ senhaAtual, novaSenha }` (autenticado). Logout: `POST /auth/logout` (contrato; o JWT é stateless — o frontend limpa o cookie httpOnly).
+Troca de senha: `POST /v1/auth/change-password` com `{ senhaAtual, novaSenha }` (autenticado). Logout: `POST /v1/auth/logout` (contrato; o JWT é stateless — o frontend limpa o cookie httpOnly).
 
 Rate limit: login (10/min) e register (5/min). Helmet e CORS configuráveis estão ativos.
 

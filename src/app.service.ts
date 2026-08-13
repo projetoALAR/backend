@@ -6,7 +6,7 @@ export class AppService {
     return {
       name: 'Alar API',
       version: '1.0.0',
-      docs: 'GET /health para status',
+      docs: 'GET /health · API versionada em /v1',
     };
   }
 }
