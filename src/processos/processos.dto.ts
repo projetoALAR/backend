@@ -10,6 +10,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /** CNJ oficial ou código interno do escritório (1–80 chars). */
 const NUMERO_PROCESSO_REGEX =
@@ -26,6 +27,7 @@ export const PROCESSO_STATUS = [
 ] as const;
 
 export class CreateProcessoDto {
+  @ApiProperty({ example: '0001234-56.2026.8.26.0100' })
   @IsString()
   @MinLength(1)
   @MaxLength(80)
@@ -35,44 +37,54 @@ export class CreateProcessoDto {
   })
   numero!: string;
 
+  @ApiProperty()
   @IsString()
   @IsIn([...PROCESSO_STATUS], {
     message: `Status inválido. Use: ${PROCESSO_STATUS.join(', ')}`,
   })
   status!: string;
 
+  @ApiProperty()
   @IsUUID()
   clienteId!: string;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   titulo?: string;
 
+  @ApiPropertyOptional({ nullable: true, type: String })
   @IsOptional()
   @IsString()
   descricao?: string | null;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   prioridade?: string;
 
+  @ApiPropertyOptional({ nullable: true, type: String })
   @IsOptional()
   @IsDateString()
   prazo?: string | null;
 
+  @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
   concluido?: boolean;
 
+  @ApiPropertyOptional({ nullable: true, type: String })
   @IsOptional()
   @IsUUID()
   responsavelId?: string | null;
 
+  @ApiPropertyOptional({ nullable: true, type: String })
   @IsOptional()
   @IsUUID()
   coResponsavelId?: string | null;

@@ -7,9 +7,7 @@ export function swaggerHabilitado(): boolean {
   return process.env.NODE_ENV !== 'production';
 }
 
-export function configurarSwagger(app: INestApplication): void {
-  if (!swaggerHabilitado()) return;
-
+export function criarDocumentoOpenApi(app: INestApplication) {
   const config = new DocumentBuilder()
     .setTitle('Alar API')
     .setDescription(
@@ -32,7 +30,13 @@ export function configurarSwagger(app: INestApplication): void {
     .addTag('Notificações', 'Inbox e preferências')
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+  return SwaggerModule.createDocument(app, config);
+}
+
+export function configurarSwagger(app: INestApplication): void {
+  if (!swaggerHabilitado()) return;
+
+  const document = criarDocumentoOpenApi(app);
   SwaggerModule.setup('docs', app, document, {
     customSiteTitle: 'Alar API — Documentação',
     swaggerOptions: {

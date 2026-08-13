@@ -8,11 +8,12 @@ import {
   Param,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { ProcessosService } from './processos.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
 import { CreateProcessoDto, UpdateProcessoDto, CreateProcessoComentarioDto } from './processos.dto';
+import { ProcessoRespostaDto } from '../openapi/respostas.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ProcessosTimelineService } from './processos-timeline.service';
@@ -31,6 +32,7 @@ export class ProcessosController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Post()
+  @ApiCreatedResponse({ type: ProcessoRespostaDto })
   async criar(
     @Body() dados: CreateProcessoDto,
     @CurrentUser() ator: AuditActor,
@@ -48,6 +50,7 @@ export class ProcessosController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get('cliente/:clienteId')
+  @ApiOkResponse({ type: ProcessoRespostaDto, isArray: true })
   async listarPorCliente(
     @Param('clienteId', ParseUUIDPipe) clienteId: string,
     @CurrentUser() user: CasoAcessoUser,
@@ -57,6 +60,7 @@ export class ProcessosController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get()
+  @ApiOkResponse({ type: ProcessoRespostaDto, isArray: true })
   async listarTodos(@CurrentUser() user: CasoAcessoUser) {
     return this.processosService.listarTodos(user);
   }
@@ -82,6 +86,7 @@ export class ProcessosController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Put(':id')
+  @ApiOkResponse({ type: ProcessoRespostaDto })
   async atualizar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dados: UpdateProcessoDto,
@@ -100,6 +105,7 @@ export class ProcessosController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Delete(':id')
+  @ApiOkResponse({ type: ProcessoRespostaDto })
   async remover(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() ator: AuditActor,

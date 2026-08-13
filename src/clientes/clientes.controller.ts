@@ -8,11 +8,12 @@ import {
   Param,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { ClientesService } from './clientes.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
 import { CreateClienteDto, UpdateClienteDto } from './clientes.dto';
+import { ClienteRespostaDto } from '../openapi/respostas.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
@@ -29,6 +30,7 @@ export class ClientesController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Post()
+  @ApiCreatedResponse({ type: ClienteRespostaDto })
   async criar(
     @Body() dados: CreateClienteDto,
     @CurrentUser() ator: AuditActor,
@@ -46,6 +48,7 @@ export class ClientesController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get()
+  @ApiOkResponse({ type: ClienteRespostaDto, isArray: true })
   async listarTodos(@CurrentUser() user: CasoAcessoUser) {
     return this.clientesService.listarTodos(user);
   }
@@ -69,6 +72,7 @@ export class ClientesController {
 
   @Roles(Role.ADMIN)
   @Post(':id/anonimizar')
+  @ApiOkResponse({ type: ClienteRespostaDto })
   async anonimizar(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() ator: AuditActor,
@@ -86,6 +90,7 @@ export class ClientesController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Put(':id')
+  @ApiOkResponse({ type: ClienteRespostaDto })
   async atualizar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dados: UpdateClienteDto,
@@ -104,6 +109,7 @@ export class ClientesController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Delete(':id')
+  @ApiOkResponse({ type: ClienteRespostaDto })
   async remover(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() ator: AuditActor,

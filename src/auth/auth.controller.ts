@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
@@ -17,6 +17,7 @@ import {
 } from './auth.dto';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
+import { UsuarioAuthDto } from '../openapi/respostas.dto';
 
 @Controller('auth')
 @ApiTags('Auth')
@@ -107,6 +108,7 @@ export class AuthController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get('me')
+  @ApiOkResponse({ type: UsuarioAuthDto })
   me(@CurrentUser() user: { id: string }) {
     return this.authService.me(user.id);
   }
@@ -133,6 +135,7 @@ export class AuthController {
 
   @Roles(Role.ADMIN)
   @Get('usuarios')
+  @ApiOkResponse({ type: UsuarioAuthDto, isArray: true })
   listUsers() {
     return this.authService.listUsers();
   }

@@ -8,11 +8,14 @@ import {
 } from 'class-validator';
 import { Role } from './roles';
 import { IsSenhaForte } from './password-policy';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class LoginDto {
+  @ApiProperty()
   @IsEmail({}, { message: 'E-mail inválido' })
   email!: string;
 
+  @ApiProperty()
   @IsString()
   @MinLength(1, { message: 'Senha obrigatória' })
   senha!: string;
