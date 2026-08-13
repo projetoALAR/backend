@@ -7,8 +7,16 @@ import {
   Delete,
   Param,
   ParseUUIDPipe,
+  StreamableFile,
+  Header,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ProcessosService } from './processos.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
@@ -17,6 +25,7 @@ import { ProcessoRespostaDto } from '../openapi/respostas.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ProcessosTimelineService } from './processos-timeline.service';
+import { ProcessosCapaService } from './processos-capa.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
 import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
 
@@ -28,6 +37,7 @@ export class ProcessosController {
     private readonly processosService: ProcessosService,
     private readonly auditoria: AuditoriaService,
     private readonly timeline: ProcessosTimelineService,
+    private readonly capa: ProcessosCapaService,
   ) {}
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
@@ -73,6 +83,21 @@ export class ProcessosController {
     @CurrentUser() user: CasoAcessoUser,
   ) {
     return this.processosService.buscarPorId(id, user);
+  }
+
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
+  @Get(':id/capa')
+  @Header('Content-Type', 'application/pdf')
+  @ApiProduces('application/pdf')
+  async baixarCapa(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: CasoAcessoUser,
+  ) {
+    const { buffer, filename } = await this.capa.gerar(id, user);
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${filename}"`,
+    });
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)

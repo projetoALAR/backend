@@ -1,8 +1,10 @@
+import { StreamableFile } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProcessosController } from './processos.controller';
 import { ProcessosService } from './processos.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ProcessosTimelineService } from './processos-timeline.service';
+import { ProcessosCapaService } from './processos-capa.service';
 import { Role } from '../auth/roles';
 
 describe('ProcessosController', () => {
@@ -20,6 +22,7 @@ describe('ProcessosController', () => {
     listar: jest.fn(),
     comentar: jest.fn(),
   };
+  const capa = { gerar: jest.fn() };
   const ator = { id: 'u1', role: Role.ADVOGADO };
 
   beforeEach(async () => {
@@ -30,6 +33,7 @@ describe('ProcessosController', () => {
         { provide: ProcessosService, useValue: processosService },
         { provide: AuditoriaService, useValue: auditoria },
         { provide: ProcessosTimelineService, useValue: timeline },
+        { provide: ProcessosCapaService, useValue: capa },
       ],
     }).compile();
 
@@ -59,6 +63,16 @@ describe('ProcessosController', () => {
     await expect(controller.listarPorCliente('c1', ator)).resolves.toEqual([]);
     await expect(controller.listarTodos(ator)).resolves.toEqual([]);
     await expect(controller.buscarPorId('p1', ator)).resolves.toEqual(processo);
+  });
+
+  it('devolve PDF da capa', async () => {
+    capa.gerar.mockResolvedValue({
+      buffer: Buffer.from('%PDF-1.4'),
+      filename: 'capa-caso.pdf',
+    });
+    const arquivo = await controller.baixarCapa('p1', ator);
+    expect(arquivo).toBeInstanceOf(StreamableFile);
+    expect(capa.gerar).toHaveBeenCalledWith('p1', ator);
   });
 
   it('delega timeline e comentário', async () => {
