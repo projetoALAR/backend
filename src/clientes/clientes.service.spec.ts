@@ -28,6 +28,48 @@ describe('ClientesService', () => {
     );
   });
 
+  it('cria pessoa física exigindo CPF', async () => {
+    prisma.cliente.create.mockResolvedValue({ id: 'c1', tipo: 'PF' });
+    await expect(
+      service.criar({ nome: 'Ana', cpf: '123.456.789-01' }),
+    ).resolves.toEqual({ id: 'c1', tipo: 'PF' });
+    expect(prisma.cliente.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tipo: 'PF',
+          cpf: '12345678901',
+          cnpj: null,
+        }),
+      }),
+    );
+  });
+
+  it('cria pessoa jurídica exigindo CNPJ', async () => {
+    prisma.cliente.create.mockResolvedValue({ id: 'c2', tipo: 'PJ' });
+    await expect(
+      service.criar({
+        nome: 'Escritório X',
+        tipo: 'PJ',
+        cnpj: '12.345.678/0001-99',
+      }),
+    ).resolves.toEqual({ id: 'c2', tipo: 'PJ' });
+    expect(prisma.cliente.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tipo: 'PJ',
+          cpf: null,
+          cnpj: '12345678000199',
+        }),
+      }),
+    );
+  });
+
+  it('rejeita PF sem CPF válido', async () => {
+    await expect(service.criar({ nome: 'Ana', cpf: '123' })).rejects.toThrow(
+      'CPF deve ter 11 dígitos',
+    );
+  });
+
   it('exportar lança 404 se o cliente não existe', async () => {
     prisma.cliente.findUnique.mockResolvedValue(null);
     await expect(service.exportar('c1')).rejects.toBeInstanceOf(

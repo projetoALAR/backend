@@ -7,14 +7,25 @@ datasource db {
 }
 
 model Cliente {
-  id        String     @id @default(uuid())
-  nome      String
-  cpf       String     @unique
-  email     String?
-  telefone  String?
-  criadoEm  DateTime   @default(now())
+  id           String     @id @default(uuid())
+  nome         String
+  tipo         String     @default("PF")
+  cpf          String?    @unique
+  cnpj         String?    @unique
+  nomeFantasia String?
+  rg           String?
+  email        String?
+  telefone     String?
+  endereco     String?
+  cidade       String?
+  uf           String?
+  cep          String?
+  observacoes  String?
+  criadoEm     DateTime   @default(now())
 
   processos Processo[]
+
+  @@index([tipo])
 }
 
 model Processo {

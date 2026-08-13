@@ -47,7 +47,8 @@ describe('preencherModelo', () => {
   });
 
   it('lista os placeholders documentados', () => {
-    expect(PLACEHOLDERS_DISPONIVEIS).toContain('{{cliente.nome}}');
+    expect(PLACEHOLDERS_DISPONIVEIS).toContain('{{cliente.cnpj}}');
+    expect(PLACEHOLDERS_DISPONIVEIS).toContain('{{cliente.endereco}}');
     expect(PLACEHOLDERS_DISPONIVEIS).toContain('{{data.hoje}}');
     expect(PLACEHOLDERS_DISPONIVEIS.length).toBeGreaterThanOrEqual(9);
   });

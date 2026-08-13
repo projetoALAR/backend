@@ -33,7 +33,7 @@ describe('BuscaService', () => {
 
   it('busca clientes e processos com RBAC', async () => {
     prisma.cliente.findMany.mockResolvedValue([
-      { id: 'c1', nome: 'Maria', cpf: '123', email: null },
+      { id: 'c1', nome: 'Maria', cpf: '123', cnpj: null, tipo: 'PF', email: null },
     ]);
     prisma.processo.findMany.mockResolvedValue([
       {

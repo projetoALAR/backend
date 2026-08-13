@@ -12,14 +12,41 @@ export class ClienteRespostaDto {
   @ApiProperty()
   nome!: string;
 
-  @ApiProperty()
-  cpf!: string;
+  @ApiProperty({ enum: ['PF', 'PJ'] })
+  tipo!: string;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  cpf!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  cnpj!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  nomeFantasia!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  rg!: string | null;
 
   @ApiPropertyOptional({ nullable: true, type: String })
   email!: string | null;
 
   @ApiPropertyOptional({ nullable: true, type: String })
   telefone!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  endereco!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  cidade!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  uf!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  cep!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  observacoes!: string | null;
 
   @ApiProperty()
   criadoEm!: string;
@@ -49,14 +76,35 @@ export class ProcessoClienteResumoDto {
   @ApiProperty()
   nome!: string;
 
+  @ApiPropertyOptional({ enum: ['PF', 'PJ'] })
+  tipo?: string;
+
   @ApiPropertyOptional({ nullable: true, type: String })
   email?: string | null;
 
   @ApiPropertyOptional({ nullable: true, type: String })
   telefone?: string | null;
 
-  @ApiPropertyOptional()
-  cpf?: string;
+  @ApiPropertyOptional({ nullable: true, type: String })
+  cpf?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  cnpj?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  nomeFantasia?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  endereco?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  cidade?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  uf?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  cep?: string | null;
 }
 
 export class ProcessoCountDto {

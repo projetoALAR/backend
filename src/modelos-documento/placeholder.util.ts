@@ -5,8 +5,10 @@
 export const PLACEHOLDERS_DISPONIVEIS = [
   '{{cliente.nome}}',
   '{{cliente.cpf}}',
+  '{{cliente.cnpj}}',
   '{{cliente.email}}',
   '{{cliente.telefone}}',
+  '{{cliente.endereco}}',
   '{{processo.numero}}',
   '{{processo.titulo}}',
   '{{processo.status}}',
@@ -19,8 +21,13 @@ export type PlaceholderDisponivel = (typeof PLACEHOLDERS_DISPONIVEIS)[number];
 export type ClienteDados = {
   nome?: string | null;
   cpf?: string | null;
+  cnpj?: string | null;
   email?: string | null;
   telefone?: string | null;
+  endereco?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  cep?: string | null;
 };
 
 export type ProcessoDados = {
@@ -60,10 +67,17 @@ export function preencherModelo(
   const mapa: Record<string, string> = {
     '{{cliente.nome}}': valorOuPendente(dados.cliente?.nome, 'cliente.nome'),
     '{{cliente.cpf}}': valorOuPendente(dados.cliente?.cpf, 'cliente.cpf'),
+    '{{cliente.cnpj}}': valorOuPendente(dados.cliente?.cnpj, 'cliente.cnpj'),
     '{{cliente.email}}': valorOuPendente(dados.cliente?.email, 'cliente.email'),
     '{{cliente.telefone}}': valorOuPendente(
       dados.cliente?.telefone,
       'cliente.telefone',
+    ),
+    '{{cliente.endereco}}': valorOuPendente(
+      [dados.cliente?.endereco, dados.cliente?.cidade, dados.cliente?.uf, dados.cliente?.cep]
+        .filter(Boolean)
+        .join(', ') || null,
+      'cliente.endereco',
     ),
     '{{processo.numero}}': valorOuPendente(
       dados.processo?.numero,
