@@ -234,6 +234,37 @@ export class ProcessoTarefaRespostaDto {
   atualizadoEm!: string;
 }
 
+export class AndamentoRespostaDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  processoId!: string;
+
+  @ApiProperty()
+  data!: string;
+
+  @ApiProperty()
+  descricao!: string;
+
+  @ApiPropertyOptional({ nullable: true, type: Number })
+  codigoMovimento!: number | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  explicacao!: string | null;
+
+  @ApiProperty({
+    description: 'true quando lançado pela equipe (não veio do tribunal)',
+  })
+  manual!: boolean;
+
+  @ApiPropertyOptional()
+  origem?: unknown;
+
+  @ApiProperty()
+  criadoEm!: string;
+}
+
 export class UsuarioAuthDto {
   @ApiProperty()
   id!: string;

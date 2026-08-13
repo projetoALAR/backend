@@ -123,6 +123,15 @@ describe('Fluxo crítico (e2e)', () => {
     expect([200, 201]).toContain(tarefaRes.status);
     expect(tarefaRes.body.titulo).toContain('Checklist E2E');
 
+    const andamentoRes = await request(app.getHttpServer())
+      .post(`/v1/processos/${processoId}/andamentos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ descricao: `Andamento interno E2E ${suffix}` });
+
+    expect([200, 201]).toContain(andamentoRes.status);
+    expect(andamentoRes.body.manual).toBe(true);
+    expect(andamentoRes.body.descricao).toContain('Andamento interno E2E');
+
     await request(app.getHttpServer())
       .get(`/v1/processos/${processoId}`)
       .set('Authorization', `Bearer ${token}`)

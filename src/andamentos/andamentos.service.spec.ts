@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AndamentosService } from './andamentos.service';
 import { AndamentosProvider } from './andamentos-provider';
 import { PrismaService } from '../prisma.service';
@@ -20,7 +20,9 @@ describe('AndamentosService', () => {
     },
     andamento: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
+      delete: jest.fn(),
     },
   };
 
@@ -152,5 +154,66 @@ describe('AndamentosService', () => {
     expect(resultado.motivo).toBe('não achou');
     expect(prisma.andamento.create).not.toHaveBeenCalled();
     expect(notificacoes.notificarTodosUsuarios).not.toHaveBeenCalled();
+  });
+
+  it('criarManual persiste origem da equipe sem notificar', async () => {
+    prisma.processo.findUnique.mockResolvedValue({ id: 'proc-1' });
+    const criado = {
+      id: 'a-manual',
+      descricao: 'Protocolado',
+      codigoMovimento: null,
+      origem: { tipo: 'manual' },
+    };
+    prisma.andamento.create.mockResolvedValue(criado);
+
+    const res = await service.criarManual(
+      'proc-1',
+      { descricao: '  Protocolado  ', data: '2026-08-13' },
+      'u1',
+    );
+    expect(res.manual).toBe(true);
+    expect(prisma.andamento.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          processoId: 'proc-1',
+          descricao: 'Protocolado',
+          origem: { tipo: 'manual', usuarioId: 'u1' },
+        }),
+      }),
+    );
+    expect(notificacoes.notificarTodosUsuarios).not.toHaveBeenCalled();
+  });
+
+  it('criarManual rejeita descrição vazia', async () => {
+    prisma.processo.findUnique.mockResolvedValue({ id: 'proc-1' });
+    await expect(
+      service.criarManual('proc-1', { descricao: '   ' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('removerManual só apaga lançamento da equipe', async () => {
+    prisma.andamento.findFirst.mockResolvedValue({
+      id: 'a1',
+      descricao: 'Protocolado',
+      codigoMovimento: null,
+      origem: { tipo: 'manual' },
+    });
+    prisma.andamento.delete.mockResolvedValue({});
+    await expect(service.removerManual('proc-1', 'a1')).resolves.toMatchObject({
+      id: 'a1',
+      manual: true,
+    });
+    expect(prisma.andamento.delete).toHaveBeenCalledWith({ where: { id: 'a1' } });
+  });
+
+  it('removerManual bloqueia andamento do tribunal', async () => {
+    prisma.andamento.findFirst.mockResolvedValue({
+      id: 'a1',
+      origem: { codigo: 26 },
+    });
+    await expect(service.removerManual('proc-1', 'a1')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(prisma.andamento.delete).not.toHaveBeenCalled();
   });
 });

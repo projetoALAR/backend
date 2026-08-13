@@ -255,7 +255,7 @@ export class ChatContextService {
 
     linhas.push('', '## Andamentos recentes');
     if (andamentos.length === 0) {
-      linhas.push('- Nenhum andamento sincronizado.');
+      linhas.push('- Nenhum andamento registrado.');
     } else {
       for (const a of andamentos) {
         linhas.push(`- ${a.data.toISOString().slice(0, 10)} | ${a.descricao}`);

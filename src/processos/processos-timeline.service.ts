@@ -5,6 +5,7 @@ import {
   type CasoAcessoUser,
 } from '../casos-acesso/caso-acesso.service';
 import type { TimelineEvento } from './processos-timeline.types';
+import { isAndamentoManual } from '../andamentos/andamento-origem.util';
 
 @Injectable()
 export class ProcessosTimelineService {
@@ -43,6 +44,7 @@ export class ProcessosTimelineService {
             descricao: true,
             data: true,
             criadoEm: true,
+            origem: true,
           },
           orderBy: { data: 'desc' },
         },
@@ -118,7 +120,9 @@ export class ProcessosTimelineService {
       ...processo.andamentos.map((a) => ({
         id: `and-${a.id}`,
         tipo: 'ANDAMENTO' as const,
-        titulo: 'Andamento processual',
+        titulo: isAndamentoManual(a.origem)
+          ? 'Andamento interno'
+          : 'Andamento processual',
         descricao: a.descricao,
         data: a.data.toISOString(),
         autor: null,
