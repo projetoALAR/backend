@@ -243,7 +243,7 @@ export class AuthService implements OnModuleInit {
 
     this.lockout.registerSuccess(email);
 
-    if (usuario.role === Role.ADMIN && usuario.totpEnabled) {
+    if (usuario.totpEnabled) {
       return {
         requires2fa: true as const,
         preAuthToken: this.signPre2faToken(usuario),
@@ -317,12 +317,12 @@ export class AuthService implements OnModuleInit {
   }
 
   async twoFactorStatus(userId: string) {
-    const usuario = await this.requireAdmin(userId);
+    const usuario = await this.requireTotpEligible(userId);
     return { enabled: !!usuario.totpEnabled };
   }
 
   async setupTwoFactor(userId: string) {
-    const usuario = await this.requireAdmin(userId);
+    const usuario = await this.requireTotpEligible(userId);
     const secret = this.totp.createSecret();
     await this.prisma.usuario.update({
       where: { id: usuario.id },
@@ -337,7 +337,7 @@ export class AuthService implements OnModuleInit {
   }
 
   async enableTwoFactor(userId: string, code: string) {
-    const usuario = await this.requireAdmin(userId);
+    const usuario = await this.requireTotpEligible(userId);
     const pending = usuario.totpPendingSecret;
     if (!pending) {
       throw new BadRequestException(
@@ -366,7 +366,7 @@ export class AuthService implements OnModuleInit {
   }
 
   async disableTwoFactor(userId: string, senha: string, code: string) {
-    const usuario = await this.requireAdmin(userId);
+    const usuario = await this.requireTotpEligible(userId);
     if (!usuario.totpEnabled || !usuario.totpSecret) {
       throw new BadRequestException('2FA não está ativo nesta conta');
     }
@@ -467,15 +467,17 @@ export class AuthService implements OnModuleInit {
     };
   }
 
-  private async requireAdmin(userId: string) {
+  private async requireTotpEligible(userId: string) {
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: userId },
     });
     if (!usuario) {
       throw new UnauthorizedException('Usuário não encontrado');
     }
-    if (usuario.role !== Role.ADMIN) {
-      throw new ForbiddenException('2FA está disponível só para administradores');
+    if (usuario.role !== Role.ADMIN && usuario.role !== Role.ADVOGADO) {
+      throw new ForbiddenException(
+        '2FA está disponível para administradores e advogados',
+      );
     }
     return usuario;
   }

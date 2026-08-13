@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
@@ -225,6 +225,42 @@ describe('AuthService.login 2FA', () => {
     );
   });
 
+  it('pede 2FA quando advogado tem TOTP ativo', async () => {
+    const sign = jest.fn().mockReturnValue('pre-2fa');
+    const prisma = {
+      usuario: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'u2',
+          nome: 'Ana',
+          email: 'ana@alar.com.br',
+          senhaHash: 'hash',
+          role: Role.ADVOGADO,
+          fotoUrl: null,
+          totpEnabled: true,
+          totpSecret: 'SECRET',
+          criadoEm: new Date(),
+        }),
+      },
+    };
+    const service = new AuthService(
+      prisma as unknown as PrismaService,
+      { sign } as unknown as JwtService,
+      {} as ConfigService,
+      { resolveSignedUrl: jest.fn() } as unknown as DocumentosService,
+      { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
+      new LoginLockoutService(),
+      new TotpService(),
+    );
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+    await expect(
+      service.login({ email: 'ana@alar.com.br', senha: 'ok' }),
+    ).resolves.toEqual({
+      requires2fa: true,
+      preAuthToken: 'pre-2fa',
+    });
+  });
+
   it('rejeita token 2FA inválido', async () => {
     const service = new AuthService(
       {} as PrismaService,
@@ -243,5 +279,44 @@ describe('AuthService.login 2FA', () => {
     await expect(
       service.verifyTwoFactorLogin('bad', '123456'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+});
+
+describe('AuthService 2FA setup', () => {
+  const prisma = {
+    usuario: { findUnique: jest.fn() },
+  };
+  const service = new AuthService(
+    prisma as unknown as PrismaService,
+    {} as JwtService,
+    {} as ConfigService,
+    { resolveSignedUrl: jest.fn() } as unknown as DocumentosService,
+    { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
+    new LoginLockoutService(),
+    new TotpService(),
+  );
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('libera status 2FA para advogado', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u2',
+      role: Role.ADVOGADO,
+      totpEnabled: false,
+    });
+    await expect(service.twoFactorStatus('u2')).resolves.toEqual({
+      enabled: false,
+    });
+  });
+
+  it('bloqueia setup 2FA para assistente', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u3',
+      role: Role.ASSISTENTE,
+      totpEnabled: false,
+    });
+    await expect(service.setupTwoFactor('u3')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 });
