@@ -258,6 +258,28 @@ export class ChatContextService {
       }
     }
 
+    const tarefas = await this.prisma.processoTarefa.findMany({
+      where: { processoId },
+      orderBy: [{ concluida: 'asc' }, { ordem: 'asc' }],
+      select: { titulo: true, concluida: true, prazo: true },
+    });
+    const pendentes = tarefas.filter((t) => !t.concluida).length;
+    linhas.push(
+      '',
+      `## Checklist do caso (${pendentes} pendente(s) de ${tarefas.length})`,
+    );
+    if (tarefas.length === 0) {
+      linhas.push('- Nenhuma tarefa cadastrada.');
+    } else {
+      for (const t of tarefas) {
+        const marca = t.concluida ? 'x' : ' ';
+        const prazo = t.prazo
+          ? ` | prazo ${t.prazo.toISOString().slice(0, 10)}`
+          : '';
+        linhas.push(`- [${marca}] ${t.titulo}${prazo}`);
+      }
+    }
+
     linhas.push('', `## Arquivos do caso (${processo._count.documentos})`);
 
     const imagensUrls: string[] = [];

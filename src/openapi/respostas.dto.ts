@@ -143,6 +143,49 @@ export class DocumentoRespostaDto {
   processoId!: string;
 }
 
+export class ProcessoTarefaCriadorDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  nome!: string;
+
+  @ApiProperty()
+  email!: string;
+}
+
+export class ProcessoTarefaRespostaDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  processoId!: string;
+
+  @ApiProperty()
+  titulo!: string;
+
+  @ApiProperty()
+  concluida!: boolean;
+
+  @ApiProperty()
+  ordem!: number;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  prazo!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  criadoPorId!: string | null;
+
+  @ApiPropertyOptional({ type: ProcessoTarefaCriadorDto, nullable: true })
+  criadoPor?: ProcessoTarefaCriadorDto | null;
+
+  @ApiProperty()
+  criadoEm!: string;
+
+  @ApiProperty()
+  atualizadoEm!: string;
+}
+
 export class UsuarioAuthDto {
   @ApiProperty()
   id!: string;

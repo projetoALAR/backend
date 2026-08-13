@@ -32,6 +32,16 @@ describe('ProcessosTimelineService', () => {
             usuario: { nome: 'Ana', email: 'ana@alar.com.br' },
           },
         ],
+        tarefas: [
+          {
+            id: 't1',
+            titulo: 'Protocolar',
+            concluida: false,
+            criadoEm: new Date('2026-01-04T10:00:00Z'),
+            atualizadoEm: new Date('2026-01-04T10:00:00Z'),
+            criadoPor: { nome: 'Ana', email: 'ana@alar.com.br' },
+          },
+        ],
       }),
     },
     auditLog: { findMany: jest.fn().mockResolvedValue([]) },
@@ -54,7 +64,7 @@ describe('ProcessosTimelineService', () => {
   it('agrega eventos ordenados do mais recente', async () => {
     const { eventos } = await service.listar(processoId, user);
     expect(casoAcesso.assertPodeVer).toHaveBeenCalledWith(user, processoId);
-    expect(eventos[0].tipo).toBe('COMENTARIO');
+    expect(eventos[0].tipo).toBe('TAREFA');
     expect(eventos.some((e) => e.tipo === 'CASO_CRIADO')).toBe(true);
     expect(eventos.some((e) => e.tipo === 'DOCUMENTO')).toBe(true);
   });

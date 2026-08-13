@@ -6,6 +6,7 @@ export const AUDIT_ENTIDADES = [
   'PROCESSO',
   'DOCUMENTO',
   'USUARIO',
+  'TAREFA',
 ] as const;
 export type AuditEntidade = (typeof AUDIT_ENTIDADES)[number];
 

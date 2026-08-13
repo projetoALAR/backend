@@ -5,6 +5,7 @@ export const TIMELINE_TIPOS = [
   'ANDAMENTO',
   'AUDITORIA',
   'COMENTARIO',
+  'TAREFA',
 ] as const;
 
 export type TimelineTipo = (typeof TIMELINE_TIPOS)[number];

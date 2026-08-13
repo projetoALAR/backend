@@ -14,6 +14,7 @@ describe('ChatContextService', () => {
     },
     membroEquipe: { count: jest.fn() },
     andamento: { findMany: jest.fn() },
+    processoTarefa: { findMany: jest.fn() },
   };
 
   const documentos = {
@@ -94,6 +95,9 @@ describe('ChatContextService', () => {
         descricao: 'Distribuição',
       },
     ]);
+    prisma.processoTarefa.findMany.mockResolvedValue([
+      { titulo: 'Protocolar', concluida: false, prazo: null },
+    ]);
 
     const resultado = await service.montarContextoCaso('p1');
     expect(resultado.textoContexto).toContain('Caso teste');
@@ -101,6 +105,8 @@ describe('ChatContextService', () => {
     expect(resultado.textoContexto).toContain('Objeto do caso');
     expect(resultado.textoContexto).toContain('## Andamentos recentes');
     expect(resultado.textoContexto).toContain('Distribuição');
+    expect(resultado.textoContexto).toContain('## Checklist do caso');
+    expect(resultado.textoContexto).toContain('Protocolar');
     expect(resultado.imagensUrls).toEqual([]);
     expect(resultado.fontes).toEqual([]);
     expect(prisma.andamento.findMany).toHaveBeenCalledWith({

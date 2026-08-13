@@ -21,7 +21,7 @@ export function criarDocumentoOpenApi(app: INestApplication) {
     .addTag('Sistema', 'Health check e utilitários')
     .addTag('Auth', 'Login, registro e 2FA')
     .addTag('Clientes', 'Cadastro e LGPD')
-    .addTag('Processos', 'Casos, timeline e comentários')
+    .addTag('Processos', 'Casos, timeline, checklist e comentários')
     .addTag('Documentos', 'Upload e URLs assinadas')
     .addTag('Chat', 'Conversas e mensagens com IA')
     .addTag('Busca', 'Busca global')

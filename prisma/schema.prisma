@@ -45,6 +45,7 @@ model Processo {
   conversas    Conversacao[]
   andamentos   Andamento[]
   comentarios  ProcessoComentario[]
+  tarefas      ProcessoTarefa[]
 
   @@index([clienteId])
   @@index([concluido])
@@ -67,6 +68,23 @@ model Andamento {
   criadoEm        DateTime @default(now())
 
   @@index([processoId, data])
+}
+
+model ProcessoTarefa {
+  id           String    @id @default(uuid())
+  processoId   String
+  processo     Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  titulo       String
+  concluida    Boolean   @default(false)
+  ordem        Int       @default(0)
+  prazo        DateTime?
+  criadoPorId  String?
+  criadoPor    Usuario?  @relation("ProcessoTarefaCriador", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  @@index([processoId, ordem])
+  @@index([processoId, concluida])
 }
 
 model ProcessoComentario {
@@ -160,6 +178,7 @@ model Usuario {
   processosComoResponsavel   Processo[] @relation("ProcessoResponsavel")
   processosComoCoResponsavel Processo[] @relation("ProcessoCoResponsavel")
   comentariosProcesso        ProcessoComentario[]
+  tarefasCriadas             ProcessoTarefa[] @relation("ProcessoTarefaCriador")
 }
 
 model Preferencia {

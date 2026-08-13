@@ -97,6 +97,15 @@ export class ClientesService {
                 criadoEm: true,
               },
             },
+            tarefas: {
+              select: {
+                id: true,
+                titulo: true,
+                concluida: true,
+                prazo: true,
+                criadoEm: true,
+              },
+            },
             conversas: {
               select: {
                 id: true,

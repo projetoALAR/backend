@@ -55,6 +55,17 @@ export class ProcessosTimelineService {
           },
           orderBy: { criadoEm: 'desc' },
         },
+        tarefas: {
+          select: {
+            id: true,
+            titulo: true,
+            concluida: true,
+            criadoEm: true,
+            atualizadoEm: true,
+            criadoPor: { select: { nome: true, email: true } },
+          },
+          orderBy: { criadoEm: 'desc' },
+        },
       },
     });
 
@@ -135,6 +146,16 @@ export class ProcessosTimelineService {
           nome: c.usuario.nome,
           email: c.usuario.email,
         },
+      })),
+      ...processo.tarefas.map((t) => ({
+        id: `tar-${t.id}`,
+        tipo: 'TAREFA' as const,
+        titulo: t.concluida ? 'Tarefa concluída' : 'Tarefa criada',
+        descricao: t.titulo,
+        data: (t.concluida ? t.atualizadoEm : t.criadoEm).toISOString(),
+        autor: t.criadoPor
+          ? { nome: t.criadoPor.nome, email: t.criadoPor.email }
+          : null,
       })),
     ];
 

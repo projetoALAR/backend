@@ -150,3 +150,35 @@ export class CreateProcessoComentarioDto {
   @MaxLength(2000)
   texto!: string;
 }
+
+export class CreateProcessoTarefaDto {
+  @ApiProperty({ example: 'Protocolar petição no TJSP' })
+  @IsString()
+  @MinLength(1, { message: 'Título obrigatório' })
+  @MaxLength(200)
+  titulo!: string;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  @IsOptional()
+  @IsDateString()
+  prazo?: string | null;
+}
+
+export class UpdateProcessoTarefaDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  titulo?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  concluida?: boolean;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  @IsOptional()
+  @IsDateString()
+  prazo?: string | null;
+}

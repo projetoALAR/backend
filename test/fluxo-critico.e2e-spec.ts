@@ -115,6 +115,22 @@ describe('Fluxo crítico (e2e)', () => {
     expect(msgRes.body.mensagemIa?.conteudo).toBeTruthy();
     expect(msgRes.body.mensagemIa.isUser).toBe(false);
 
+    const tarefaRes = await request(app.getHttpServer())
+      .post(`/v1/processos/${processoId}/tarefas`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ titulo: `Checklist E2E ${suffix}` });
+
+    expect([200, 201]).toContain(tarefaRes.status);
+    expect(tarefaRes.body.titulo).toContain('Checklist E2E');
+
+    await request(app.getHttpServer())
+      .get(`/v1/processos/${processoId}/tarefas`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.length).toBeGreaterThanOrEqual(1);
+      });
+
     // Upload: exige Supabase — valida que a rota está autenticada
     const uploadRes = await request(app.getHttpServer())
       .post('/v1/documentos/upload')
@@ -128,5 +144,5 @@ describe('Fluxo crítico (e2e)', () => {
     // Com Storage configurado: 201; sem: 4xx/5xx — nunca 401
     expect(uploadRes.status).not.toBe(401);
     expect([201, 400, 500, 502, 503]).toContain(uploadRes.status);
-  });
+  }, 20_000);
 });
