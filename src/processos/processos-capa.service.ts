@@ -103,7 +103,7 @@ export class ProcessosCapaService {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      const linha = (rotulo: string, valor: string) => {
+      const linha = (rotulo: string, valor?: string | null) => {
         doc.font('Helvetica-Bold').fontSize(9).text(textoPdf(rotulo), { continued: true });
         doc.font('Helvetica').text(`  ${textoPdf(valor)}`);
       };
