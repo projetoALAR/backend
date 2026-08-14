@@ -4,8 +4,6 @@ import { PrismaService } from '../prisma.service';
 import {
   AUDIT_ACOES,
   AUDIT_ENTIDADES,
-  type AuditAcao,
-  type AuditEntidade,
   type RegistrarAuditInput,
 } from './auditoria.types';
 
@@ -54,10 +52,13 @@ export class AuditoriaService {
       filtro.entidade &&
       (AUDIT_ENTIDADES as readonly string[]).includes(filtro.entidade)
     ) {
-      where.entidade = filtro.entidade as AuditEntidade;
+      where.entidade = filtro.entidade;
     }
-    if (filtro.acao && (AUDIT_ACOES as readonly string[]).includes(filtro.acao)) {
-      where.acao = filtro.acao as AuditAcao;
+    if (
+      filtro.acao &&
+      (AUDIT_ACOES as readonly string[]).includes(filtro.acao)
+    ) {
+      where.acao = filtro.acao;
     }
     if (filtro.usuarioId) {
       where.usuarioId = filtro.usuarioId;

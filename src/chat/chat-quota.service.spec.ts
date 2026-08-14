@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatQuotaService } from './chat-quota.service';
 import { PrismaService } from '../prisma.service';
@@ -25,10 +25,7 @@ describe('ChatQuotaService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new ChatQuotaService(
-      prisma as unknown as PrismaService,
-      config,
-    );
+    service = new ChatQuotaService(prisma as unknown as PrismaService, config);
   });
 
   it('bloqueia quando uso + estimativa excede limite', async () => {

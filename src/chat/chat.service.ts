@@ -9,10 +9,7 @@ import { ChatContextService } from './chat-context.service';
 import { filtrarFontesCitadas, type ChatFonte } from './chat-fonte.types';
 import { ChatQuotaService } from './chat-quota.service';
 import type { Role } from '../auth/roles';
-import {
-  exportarConversaJson,
-  exportarConversaMarkdown,
-} from './chat-export';
+import { exportarConversaJson, exportarConversaMarkdown } from './chat-export';
 
 @Injectable()
 export class ChatService {
@@ -146,12 +143,12 @@ export class ChatService {
     });
 
     const historico = conversa.mensagens.map((m) => ({
-      role: (m.isUser ? 'user' : 'assistant') as 'user' | 'assistant',
+      role: m.isUser ? 'user' : 'assistant',
       content: m.conteudo,
     }));
 
     let resposta: string;
-    let tokensUsados = 0;
+    let tokensUsados: number;
     let fontesResposta: ChatFonte[] = [];
     try {
       if (conversa.processoId) {
@@ -160,12 +157,16 @@ export class ChatService {
           conteudo,
         );
         const pedeArquivos = this.chatContext.perguntaPedeArquivos(conteudo);
-        const llmRes = await this.llm.gerarRespostaJuridica(conteudo, historico, {
-          modo: 'caso',
-          contextoTexto: caso.textoContexto,
-          imagensUrls: caso.imagensUrls,
-          detalheImagem: pedeArquivos ? 'high' : 'auto',
-        });
+        const llmRes = await this.llm.gerarRespostaJuridica(
+          conteudo,
+          historico,
+          {
+            modo: 'caso',
+            contextoTexto: caso.textoContexto,
+            imagensUrls: caso.imagensUrls,
+            detalheImagem: pedeArquivos ? 'high' : 'auto',
+          },
+        );
         resposta = llmRes.content;
         tokensUsados = llmRes.tokensUsados;
         fontesResposta = filtrarFontesCitadas(resposta, caso.fontes);
@@ -173,10 +174,14 @@ export class ChatService {
         const contextoProjeto = await this.chatContext.montarContexto({
           pergunta: conteudo,
         });
-        const llmRes = await this.llm.gerarRespostaJuridica(conteudo, historico, {
-          modo: 'workspace',
-          contextoTexto: contextoProjeto,
-        });
+        const llmRes = await this.llm.gerarRespostaJuridica(
+          conteudo,
+          historico,
+          {
+            modo: 'workspace',
+            contextoTexto: contextoProjeto,
+          },
+        );
         resposta = llmRes.content;
         tokensUsados = llmRes.tokensUsados;
       }
@@ -193,9 +198,7 @@ export class ChatService {
         isUser: false,
         tokensUsados,
         fontes:
-          fontesResposta.length > 0
-            ? (fontesResposta as object[])
-            : undefined,
+          fontesResposta.length > 0 ? (fontesResposta as object[]) : undefined,
       },
     });
 
@@ -227,11 +230,7 @@ export class ChatService {
     return this.chatQuota.resumo(usuarioId, role);
   }
 
-  registrarFeedback(
-    mensagemId: string,
-    usuarioId: string,
-    util: boolean,
-  ) {
+  registrarFeedback(mensagemId: string, usuarioId: string, util: boolean) {
     return this.chatQuota.registrarFeedback(mensagemId, usuarioId, util);
   }
 

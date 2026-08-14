@@ -27,7 +27,7 @@ describe('EquipeService', () => {
   };
 
   const documentos = {
-    resolveSignedUrl: jest.fn(async (url: string) => `signed:${url}`),
+    resolveSignedUrl: jest.fn((url: string) => `signed:${url}`),
   };
 
   let service: EquipeService;

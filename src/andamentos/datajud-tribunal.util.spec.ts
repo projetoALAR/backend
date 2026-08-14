@@ -1,5 +1,4 @@
 import {
-  formatarNumeroCnj,
   nomeTribunal,
   normalizarNumeroCnj,
   resolverTribunalSigla,
