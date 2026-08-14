@@ -1,6 +1,9 @@
 import {
+  formatarNumeroCnj,
+  nomeTribunal,
   normalizarNumeroCnj,
   resolverTribunalSigla,
+  validarDigitoCnj,
 } from './datajud-tribunal.util';
 
 describe('datajud-tribunal.util', () => {
@@ -13,6 +16,25 @@ describe('datajud-tribunal.util', () => {
 
     it('rejeita número com tamanho inválido', () => {
       expect(normalizarNumeroCnj('123')).toBeNull();
+    });
+  });
+
+  describe('validarDigitoCnj', () => {
+    it('aceita dígito verificador calculado pela regra do CNJ', () => {
+      const sequencial = '0000001';
+      const resto = '20248260100';
+      const dv = String(98n - (BigInt(sequencial + resto) % 97n)).padStart(
+        2,
+        '0',
+      );
+      expect(validarDigitoCnj(sequencial + dv + resto)).toBe(true);
+      if (dv !== '99') {
+        expect(validarDigitoCnj(sequencial + '99' + resto)).toBe(false);
+      }
+    });
+
+    it('rejeita tamanho inválido', () => {
+      expect(validarDigitoCnj('123')).toBe(false);
     });
   });
 
@@ -44,6 +66,13 @@ describe('datajud-tribunal.util', () => {
 
     it('retorna null para número inválido', () => {
       expect(resolverTribunalSigla('abc')).toBeNull();
+    });
+  });
+
+  describe('nomeTribunal', () => {
+    it('formata a sigla do índice', () => {
+      expect(nomeTribunal('tjsp')).toBe('TJSP');
+      expect(nomeTribunal('tre-sp')).toBe('TRE-SP');
     });
   });
 });

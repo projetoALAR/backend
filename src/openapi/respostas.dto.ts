@@ -143,6 +143,12 @@ export class ProcessoRespostaDto {
   @ApiProperty()
   concluido!: boolean;
 
+  @ApiPropertyOptional({ nullable: true, type: String })
+  tribunalSigla?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  andamentosConsulta?: Record<string, unknown> | null;
+
   @ApiProperty()
   clienteId!: string;
 

@@ -33,6 +33,7 @@ import {
 import {
   normalizarNumeroCnj,
   resolverTribunalSigla,
+  validarDigitoCnj,
 } from './datajud-tribunal.util';
 
 type DatajudMovimentoBruto = {
@@ -71,6 +72,15 @@ export class DatajudService implements AndamentosProvider {
         ok: false,
         motivo: 'erro',
         mensagem: 'Número CNJ inválido (esperado 20 dígitos)',
+      };
+    }
+
+    if (!validarDigitoCnj(numero)) {
+      return {
+        ok: false,
+        motivo: 'cnj_invalido',
+        mensagem:
+          'Dígito verificador do CNJ não confere. Confira o número completo (20 dígitos).',
       };
     }
 

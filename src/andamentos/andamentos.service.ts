@@ -10,20 +10,82 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
 import {
+  CasoAcessoService,
+  type CasoAcessoUser,
+} from '../casos-acesso/caso-acesso.service';
+import {
   ANDAMENTOS_PROVIDER,
   AndamentoProviderMovimento,
 } from './andamentos-provider';
 import type { AndamentosProvider } from './andamentos-provider';
-import { resolverTribunalSigla } from './datajud-tribunal.util';
+import {
+  formatarNumeroCnj,
+  nomeTribunal,
+  normalizarNumeroCnj,
+  resolverTribunalSigla,
+} from './datajud-tribunal.util';
 import { explicarMovimento } from './movimento-glossario.util';
 import { isAndamentoManual } from './andamento-origem.util';
 import type { CreateAndamentoManualDto } from './andamentos.dto';
 
-export type ResultadoSyncAndamentos = {
-  processoId: string;
+export type AndamentosConsultaSnapshot = {
+  em: string;
+  status: string;
+  mensagem: string;
+  tribunalSigla: string | null;
+  tribunalNome: string | null;
   inseridos: number;
+  jaExistentes: number;
+  totalNaFonte: number;
+  ultimoMovimento: { data: string; descricao: string } | null;
+};
+
+export type ResultadoSyncAndamentos = AndamentosConsultaSnapshot & {
+  processoId: string;
+  ok: boolean;
   motivo?: string;
 };
+
+export type MovimentoConsultaDto = {
+  data: string;
+  descricao: string;
+  codigoMovimento: number | null;
+  explicacao: string | null;
+};
+
+export type ResultadoConsultaPublica = {
+  ok: boolean;
+  numero: string | null;
+  tribunalSigla: string | null;
+  tribunalNome: string | null;
+  motivo?: string;
+  status: string;
+  movimentos: MovimentoConsultaDto[];
+  caso?: { id: string; titulo: string | null; numero: string } | null;
+};
+
+function mensagemConsulta(
+  status: string,
+  mensagem: string,
+  sigla?: string | null,
+) {
+  const tribunal = nomeTribunal(sigla);
+  switch (status) {
+    case 'nao_encontrado':
+      return tribunal
+        ? `Processo não encontrado na base pública do CNJ (${tribunal}). Pode ser segredo de justiça, índice incompleto ou número com dígito errado.`
+        : mensagem;
+    case 'tribunal_nao_mapeado':
+      return 'Este tribunal não tem índice público no DataJud (ex.: STF). Registre o andamento interno.';
+    case 'sem_api_key':
+      return 'Consulta ao CNJ não está configurada neste ambiente.';
+    case 'cnj_invalido':
+    case 'ok':
+      return mensagem;
+    default:
+      return mensagem || 'Não foi possível consultar a base pública do CNJ.';
+  }
+}
 
 @Injectable()
 export class AndamentosService {
@@ -34,6 +96,7 @@ export class AndamentosService {
     @Inject(ANDAMENTOS_PROVIDER)
     private readonly provider: AndamentosProvider,
     private readonly notificacoes: NotificacoesService,
+    private readonly casoAcesso: CasoAcessoService,
   ) {}
 
   async listarPorProcesso(processoId: string) {
@@ -132,6 +195,54 @@ export class AndamentosService {
   }
 
   /**
+   * Consulta a base pública do CNJ sem gravar andamentos.
+   * Uso não comercial (DataJud).
+   */
+  async consultarPublico(
+    numeroInformado: string,
+    user: CasoAcessoUser,
+  ): Promise<ResultadoConsultaPublica> {
+    const consulta = await this.provider.consultarPorNumero(numeroInformado);
+    const digits = normalizarNumeroCnj(numeroInformado);
+    const formatado = digits ? formatarNumeroCnj(digits) : null;
+    const sigla =
+      (consulta.ok ? consulta.tribunalSigla : null) ||
+      (digits ? resolverTribunalSigla(digits) : null) ||
+      null;
+    const status = consulta.ok ? 'ok' : consulta.motivo;
+    const mensagem = mensagemConsulta(
+      status,
+      consulta.ok
+        ? `${consulta.movimentos.length} movimento(s) na base pública.`
+        : consulta.mensagem,
+      sigla,
+    );
+
+    const movimentos = consulta.ok
+      ? [...consulta.movimentos]
+          .sort((a, b) => b.data.getTime() - a.data.getTime())
+          .slice(0, 30)
+          .map((mov) => ({
+            data: mov.data.toISOString(),
+            descricao: mov.descricao,
+            codigoMovimento: mov.codigoMovimento,
+            explicacao: explicarMovimento(mov.codigoMovimento, mov.descricao),
+          }))
+      : [];
+
+    return {
+      ok: consulta.ok,
+      numero: formatado,
+      tribunalSigla: sigla,
+      tribunalNome: nomeTribunal(sigla),
+      status,
+      motivo: consulta.ok ? undefined : mensagem,
+      movimentos,
+      caso: await this.encontrarCasoPorCnj(numeroInformado, user),
+    };
+  }
+
+  /**
    * Busca andamentos no provider injetado e persiste os novos.
    * Trocar o provider (DataJud → comercial) não exige mudar schema nem este fluxo.
    */
@@ -157,10 +268,21 @@ export class AndamentosService {
       this.logger.warn(
         `Sync andamentos ${processo.id}: ${consulta.motivo} — ${consulta.mensagem}`,
       );
+      const snapshot = this.montarSnapshot({
+        status: consulta.motivo,
+        mensagem: consulta.mensagem,
+        tribunalSigla: tribunalCache,
+        inseridos: 0,
+        jaExistentes: 0,
+        totalNaFonte: 0,
+        ultimo: null,
+      });
+      await this.salvarConsulta(processo.id, snapshot);
       return {
         processoId: processo.id,
-        inseridos: 0,
-        motivo: consulta.mensagem,
+        ok: false,
+        motivo: snapshot.mensagem,
+        ...snapshot,
       };
     }
 
@@ -210,7 +332,81 @@ export class AndamentosService {
       );
     }
 
-    return { processoId: processo.id, inseridos };
+    const ordenados = [...consulta.movimentos].sort(
+      (a, b) => b.data.getTime() - a.data.getTime(),
+    );
+    const ultimo = ordenados[0] ?? null;
+    const snapshot = this.montarSnapshot({
+      status: 'ok',
+      mensagem:
+        inseridos > 0
+          ? `${inseridos} andamento(s) novo(s) importado(s) da base pública.`
+          : 'Nenhum andamento novo desde a última consulta.',
+      tribunalSigla: siglaResolvida || tribunalCache,
+      inseridos,
+      jaExistentes: consulta.movimentos.length - inseridos,
+      totalNaFonte: consulta.movimentos.length,
+      ultimo,
+    });
+    await this.salvarConsulta(processo.id, snapshot);
+    return { processoId: processo.id, ok: true, ...snapshot };
+  }
+
+  private montarSnapshot(params: {
+    status: string;
+    mensagem: string;
+    tribunalSigla?: string | null;
+    inseridos: number;
+    jaExistentes: number;
+    totalNaFonte: number;
+    ultimo: AndamentoProviderMovimento | null;
+  }): AndamentosConsultaSnapshot {
+    const sigla = params.tribunalSigla ?? null;
+    return {
+      em: new Date().toISOString(),
+      status: params.status,
+      mensagem: mensagemConsulta(params.status, params.mensagem, sigla),
+      tribunalSigla: sigla,
+      tribunalNome: nomeTribunal(sigla),
+      inseridos: params.inseridos,
+      jaExistentes: params.jaExistentes,
+      totalNaFonte: params.totalNaFonte,
+      ultimoMovimento: params.ultimo
+        ? {
+            data: params.ultimo.data.toISOString(),
+            descricao: params.ultimo.descricao,
+          }
+        : null,
+    };
+  }
+
+  private async salvarConsulta(
+    processoId: string,
+    snapshot: AndamentosConsultaSnapshot,
+  ) {
+    await this.prisma.processo.update({
+      where: { id: processoId },
+      data: { andamentosConsulta: snapshot as Prisma.InputJsonValue },
+    });
+  }
+
+  private async encontrarCasoPorCnj(numero: string, user: CasoAcessoUser) {
+    const digits = normalizarNumeroCnj(numero);
+    if (!digits) return null;
+    const formatado = formatarNumeroCnj(digits);
+    const candidatos = [numero.trim(), digits, formatado].filter(
+      (v): v is string => !!v,
+    );
+    const processo = await this.prisma.processo.findFirst({
+      where: {
+        AND: [
+          this.casoAcesso.visibilidadeProcesso(user),
+          { OR: candidatos.map((numero) => ({ numero })) },
+        ],
+      },
+      select: { id: true, titulo: true, numero: true },
+    });
+    return processo;
   }
 
   private chaveAndamento(

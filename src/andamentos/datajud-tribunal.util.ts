@@ -58,6 +58,35 @@ export function normalizarNumeroCnj(numero: string): string | null {
 }
 
 /**
+ * Dígito verificador do CNJ (Resolução 65/2008):
+ * DD = 98 − (NNNNNNN + AAAA + J + TR + OOOO) mod 97
+ */
+export function validarDigitoCnj(numero: string): boolean {
+  const digits = normalizarNumeroCnj(numero);
+  if (!digits) return false;
+  const sequencial = digits.slice(0, 7);
+  const dv = digits.slice(7, 9);
+  const resto = digits.slice(9);
+  const esperado = String(98n - (BigInt(sequencial + resto) % 97n)).padStart(
+    2,
+    '0',
+  );
+  return dv === esperado;
+}
+
+export function formatarNumeroCnj(numero: string): string | null {
+  const digits = normalizarNumeroCnj(numero);
+  if (!digits) return null;
+  return `${digits.slice(0, 7)}-${digits.slice(7, 9)}.${digits.slice(9, 13)}.${digits.slice(13, 14)}.${digits.slice(14, 16)}.${digits.slice(16)}`;
+}
+
+/** Rótulo curto do índice DataJud (ex.: tjsp → TJSP). */
+export function nomeTribunal(sigla?: string | null): string | null {
+  if (!sigla?.trim()) return null;
+  return sigla.trim().replace(/-/g, '-').toUpperCase();
+}
+
+/**
  * Extrai J e TR do número CNJ e devolve a sigla do índice DataJud
  * (ex.: `tjsp`, `trf1`, `trt2`, `stj`) ou `null` se não mapeado.
  */

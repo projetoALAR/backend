@@ -24,3 +24,14 @@ export class CreateAndamentoManualDto {
   @IsDateString()
   data?: string;
 }
+
+export class ConsultaProcessualQueryDto {
+  @ApiProperty({
+    example: '0001234-56.2024.8.26.0100',
+    description: 'Número CNJ (20 dígitos, com ou sem máscara)',
+  })
+  @IsString()
+  @MinLength(15)
+  @MaxLength(30)
+  numero!: string;
+}

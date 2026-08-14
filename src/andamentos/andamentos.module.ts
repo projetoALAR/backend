@@ -6,10 +6,11 @@ import { AndamentosService } from './andamentos.service';
 import { AndamentosSyncScheduler } from './andamentos-sync.scheduler';
 import { ANDAMENTOS_PROVIDER } from './andamentos-provider';
 import { DatajudService } from './datajud.service';
+import { ConsultaProcessualController } from './consulta-processual.controller';
 
 @Module({
   imports: [NotificacoesModule],
-  controllers: [AndamentosController],
+  controllers: [AndamentosController, ConsultaProcessualController],
   providers: [
     AndamentosService,
     DatajudService,

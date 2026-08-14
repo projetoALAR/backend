@@ -3,6 +3,8 @@ import { AndamentosService } from './andamentos.service';
 import { AndamentosProvider } from './andamentos-provider';
 import { PrismaService } from '../prisma.service';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
+import { CasoAcessoService } from '../casos-acesso/caso-acesso.service';
+import { Role } from '../auth/roles';
 
 describe('AndamentosService', () => {
   const processo = {
@@ -16,6 +18,7 @@ describe('AndamentosService', () => {
   const prisma = {
     processo: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
     },
     andamento: {
@@ -33,15 +36,20 @@ describe('AndamentosService', () => {
   const notificacoes = {
     notificarTodosUsuarios: jest.fn(),
   };
+  const casoAcesso = {
+    visibilidadeProcesso: jest.fn().mockReturnValue({}),
+  };
 
   let service: AndamentosService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.processo.update.mockResolvedValue({});
     service = new AndamentosService(
       prisma as unknown as PrismaService,
       provider,
       notificacoes as unknown as NotificacoesService,
+      casoAcesso as unknown as CasoAcessoService,
     );
   });
 
@@ -116,6 +124,9 @@ describe('AndamentosService', () => {
     const resultado = await service.sincronizarProcesso('proc-1');
 
     expect(resultado.inseridos).toBe(1);
+    expect(resultado.ok).toBe(true);
+    expect(resultado.totalNaFonte).toBe(2);
+    expect(resultado.tribunalSigla).toBe('tjsp');
     expect(prisma.andamento.create).toHaveBeenCalledTimes(1);
     const calls = prisma.andamento.create.mock.calls as Array<
       [
@@ -151,9 +162,42 @@ describe('AndamentosService', () => {
 
     const resultado = await service.sincronizarProcesso('proc-1');
     expect(resultado.inseridos).toBe(0);
-    expect(resultado.motivo).toBe('não achou');
+    expect(resultado.ok).toBe(false);
+    expect(resultado.status).toBe('nao_encontrado');
+    expect(resultado.motivo).toMatch(/não encontrado/i);
     expect(prisma.andamento.create).not.toHaveBeenCalled();
     expect(notificacoes.notificarTodosUsuarios).not.toHaveBeenCalled();
+    expect(prisma.processo.update).toHaveBeenCalled();
+  });
+
+  it('consultarPublico devolve movimentos sem gravar', async () => {
+    (provider.consultarPorNumero as jest.Mock).mockResolvedValue({
+      ok: true,
+      tribunalSigla: 'tjsp',
+      movimentos: [
+        {
+          codigoMovimento: 26,
+          descricao: 'Distribuído',
+          data: new Date('2024-01-10T12:00:00.000Z'),
+          origem: {},
+        },
+      ],
+    });
+    prisma.processo.findFirst.mockResolvedValue({
+      id: 'proc-1',
+      titulo: 'Caso teste',
+      numero: '1000123-45.2024.8.26.0100',
+    });
+
+    const resultado = await service.consultarPublico(
+      '1000123-45.2024.8.26.0100',
+      { id: 'u1', role: Role.ADVOGADO },
+    );
+    expect(resultado.ok).toBe(true);
+    expect(resultado.movimentos).toHaveLength(1);
+    expect(resultado.tribunalNome).toBe('TJSP');
+    expect(resultado.caso?.id).toBe('proc-1');
+    expect(prisma.andamento.create).not.toHaveBeenCalled();
   });
 
   it('criarManual persiste origem da equipe sem notificar', async () => {

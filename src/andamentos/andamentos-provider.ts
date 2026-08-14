@@ -26,7 +26,7 @@ export type AndamentosConsultaSucesso = {
 
 export type AndamentosConsultaFalha = {
   ok: false;
-  motivo: 'tribunal_nao_mapeado' | 'nao_encontrado' | 'sem_api_key' | 'erro';
+  motivo: 'tribunal_nao_mapeado' | 'nao_encontrado' | 'sem_api_key' | 'erro' | 'cnj_invalido';
   mensagem: string;
 };
 

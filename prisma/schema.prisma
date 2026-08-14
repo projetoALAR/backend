@@ -40,6 +40,8 @@ model Processo {
   concluido     Boolean   @default(false)
   /// Cache da sigla DataJud resolvida a partir do número CNJ (ex.: tjsp, trf1)
   tribunalSigla String?
+  /// Última consulta à base pública de andamentos (DataJud hoje).
+  andamentosConsulta Json?
   criadoEm      DateTime  @default(now())
   atualizadoEm  DateTime  @updatedAt
 
