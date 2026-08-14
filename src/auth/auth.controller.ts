@@ -1,4 +1,11 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
@@ -56,19 +63,19 @@ export class AuthController {
     return this.authService.verifyTwoFactorLogin(body.preAuthToken, body.code);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.ADVOGADO)
   @Get('2fa/status')
   twoFactorStatus(@CurrentUser() user: { id: string }) {
     return this.authService.twoFactorStatus(user.id);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.ADVOGADO)
   @Post('2fa/setup')
   setupTwoFactor(@CurrentUser() user: { id: string }) {
     return this.authService.setupTwoFactor(user.id);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.ADVOGADO)
   @Post('2fa/enable')
   async enableTwoFactor(
     @Body() body: Enable2faDto,
@@ -85,7 +92,7 @@ export class AuthController {
     return result;
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.ADVOGADO)
   @Post('2fa/disable')
   async disableTwoFactor(
     @Body() body: Disable2faDto,
@@ -101,6 +108,24 @@ export class AuthController {
       entidade: 'USUARIO',
       entidadeId: ator.id,
       resumo: 'Desativou autenticação em dois fatores (2FA)',
+      ator,
+    });
+    return result;
+  }
+
+  /** Via de suporte/recuperação: ADMIN desativa o 2FA de OUTRO usuário (perda de acesso). */
+  @Roles(Role.ADMIN)
+  @Post('usuarios/:id/2fa/disable')
+  async adminDisableTwoFactor(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() ator: AuditActor & { id: string },
+  ) {
+    const result = await this.authService.adminDisableTwoFactor(id);
+    await this.auditoria.registrar({
+      acao: 'EDITAR',
+      entidade: 'USUARIO',
+      entidadeId: id,
+      resumo: `Admin desativou 2FA do usuário ${id} (recuperação de acesso)`,
       ator,
     });
     return result;

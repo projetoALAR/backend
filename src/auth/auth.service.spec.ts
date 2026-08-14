@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, HttpException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
@@ -280,6 +285,47 @@ describe('AuthService.login 2FA', () => {
       service.verifyTwoFactorLogin('bad', '123456'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
+
+  it('advogado com 2FA ativo consegue concluir o login (não é restrito a admin)', async () => {
+    const verify = jest.fn().mockReturnValue({
+      sub: 'u2',
+      email: 'ana@alar.com.br',
+      typ: '2fa',
+    });
+    const sign = jest.fn().mockReturnValue('access-token');
+    const prisma = {
+      usuario: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'u2',
+          nome: 'Ana',
+          email: 'ana@alar.com.br',
+          senhaHash: 'hash',
+          role: Role.ADVOGADO,
+          fotoUrl: null,
+          totpEnabled: true,
+          totpSecret: 'SECRET',
+          totpRecoveryHashes: [],
+          criadoEm: new Date(),
+        }),
+      },
+    };
+    const service = new AuthService(
+      prisma as unknown as PrismaService,
+      { verify, sign } as unknown as JwtService,
+      {} as ConfigService,
+      { resolveSignedUrl: jest.fn() } as unknown as DocumentosService,
+      { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
+      new LoginLockoutService(),
+      { verifyCode: jest.fn().mockReturnValue(true) } as unknown as TotpService,
+    );
+
+    await expect(
+      service.verifyTwoFactorLogin('pre-2fa', '123456'),
+    ).resolves.toEqual({
+      access_token: 'access-token',
+      user: expect.objectContaining({ id: 'u2', role: Role.ADVOGADO }),
+    });
+  });
 });
 
 describe('AuthService 2FA setup', () => {
@@ -317,6 +363,65 @@ describe('AuthService 2FA setup', () => {
     });
     await expect(service.setupTwoFactor('u3')).rejects.toBeInstanceOf(
       ForbiddenException,
+    );
+  });
+});
+
+describe('AuthService.adminDisableTwoFactor', () => {
+  const prisma = {
+    usuario: { findUnique: jest.fn(), update: jest.fn() },
+  };
+  const service = new AuthService(
+    prisma as unknown as PrismaService,
+    {} as JwtService,
+    {} as ConfigService,
+    { resolveSignedUrl: jest.fn() } as unknown as DocumentosService,
+    { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
+    new LoginLockoutService(),
+    new TotpService(),
+  );
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('admin desativa 2FA de outro usuário sem exigir senha/código', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u2',
+      role: Role.ADVOGADO,
+      totpEnabled: true,
+      totpSecret: 'SECRET',
+      totpRecoveryHashes: ['hash1'],
+    });
+    prisma.usuario.update.mockResolvedValue({});
+
+    await expect(service.adminDisableTwoFactor('u2')).resolves.toEqual({
+      ok: true,
+    });
+    expect(prisma.usuario.update).toHaveBeenCalledWith({
+      where: { id: 'u2' },
+      data: {
+        totpSecret: null,
+        totpPendingSecret: null,
+        totpEnabled: false,
+        totpRecoveryHashes: [],
+      },
+    });
+  });
+
+  it('falha se o usuário alvo não existe', async () => {
+    prisma.usuario.findUnique.mockResolvedValue(null);
+    await expect(
+      service.adminDisableTwoFactor('inexistente'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('falha se o usuário alvo não tem 2FA ativo', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u3',
+      role: Role.ADVOGADO,
+      totpEnabled: false,
+    });
+    await expect(service.adminDisableTwoFactor('u3')).rejects.toBeInstanceOf(
+      BadRequestException,
     );
   });
 });

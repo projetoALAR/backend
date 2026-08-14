@@ -349,8 +349,7 @@ export class AuthService implements OnModuleInit {
     }
 
     const recoveryCodes = this.totp.generateRecoveryCodes();
-    const totpRecoveryHashes =
-      await this.totp.hashRecoveryCodes(recoveryCodes);
+    const totpRecoveryHashes = await this.totp.hashRecoveryCodes(recoveryCodes);
 
     await this.prisma.usuario.update({
       where: { id: usuario.id },
@@ -383,12 +382,34 @@ export class AuthService implements OnModuleInit {
     );
     const remaining = totpOk
       ? usuario.totpRecoveryHashes
-      : await this.totp.consumeRecoveryCode(
-          usuario.totpRecoveryHashes,
-          code,
-        );
+      : await this.totp.consumeRecoveryCode(usuario.totpRecoveryHashes, code);
     if (!totpOk && remaining === null) {
       throw new BadRequestException('Código 2FA inválido');
+    }
+
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        totpSecret: null,
+        totpPendingSecret: null,
+        totpEnabled: false,
+        totpRecoveryHashes: [],
+      },
+    });
+
+    return { ok: true };
+  }
+
+  /** Via de suporte/recuperação: ADMIN desativa o 2FA de outro usuário sem senha/código. */
+  async adminDisableTwoFactor(userId: string) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+    });
+    if (!usuario) {
+      throw new UnauthorizedException('Usuário não encontrado');
+    }
+    if (!usuario.totpEnabled) {
+      throw new BadRequestException('2FA não está ativo nesta conta');
     }
 
     await this.prisma.usuario.update({
@@ -407,11 +428,7 @@ export class AuthService implements OnModuleInit {
   async verifyTwoFactorLogin(preAuthToken: string, code: string) {
     let payload: { sub?: string; email?: string; typ?: string };
     try {
-      payload = this.jwt.verify(preAuthToken) as {
-        sub?: string;
-        email?: string;
-        typ?: string;
-      };
+      payload = this.jwt.verify(preAuthToken);
     } catch {
       throw new UnauthorizedException('Sessão 2FA expirada. Entre de novo.');
     }
@@ -429,7 +446,7 @@ export class AuthService implements OnModuleInit {
     if (
       !usuario ||
       usuario.email !== email ||
-      usuario.role !== Role.ADMIN ||
+      (usuario.role !== Role.ADMIN && usuario.role !== Role.ADVOGADO) ||
       !usuario.totpEnabled ||
       !usuario.totpSecret
     ) {
