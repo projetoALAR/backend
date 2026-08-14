@@ -190,11 +190,13 @@ export class DocumentosService {
 
   /**
    * Gera PDF a partir de texto, faz upload e cria o Documento do processo.
+   * `revisao` registra quem confirmou a revisão humana e quando (auditoria/LGPD).
    */
   async criarDocumentoDeTexto(
     processoId: string,
     nomeArquivo: string,
     conteudoTexto: string,
+    revisao?: { usuarioId: string; em: Date },
   ) {
     if (!processoId) {
       throw new BadRequestException('processoId obrigatório');
@@ -241,6 +243,8 @@ export class DocumentosService {
         urlArquivo: storagePath,
         tamanho: pdfBuffer.length,
         processoId,
+        revisadoPorUsuarioId: revisao?.usuarioId ?? null,
+        revisadoEm: revisao?.em ?? null,
       },
     });
 
@@ -251,6 +255,7 @@ export class DocumentosService {
     const docs = await this.prisma.documento.findMany({
       where: { processoId },
       orderBy: { criadoEm: 'desc' },
+      include: { revisadoPorUsuario: { select: { nome: true } } },
     });
     return Promise.all(docs.map((d) => this.withSignedUrl(d)));
   }

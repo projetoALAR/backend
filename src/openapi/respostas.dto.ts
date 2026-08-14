@@ -195,6 +195,20 @@ export class DocumentoRespostaDto {
 
   @ApiProperty()
   processoId!: string;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  revisadoPorUsuarioId!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  revisadoEm!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: () => DocumentoRevisorDto })
+  revisadoPorUsuario!: DocumentoRevisorDto | null;
+}
+
+export class DocumentoRevisorDto {
+  @ApiProperty()
+  nome!: string;
 }
 
 export class ProcessoTarefaCriadorDto {

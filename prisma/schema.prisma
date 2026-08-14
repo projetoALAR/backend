@@ -136,7 +136,13 @@ model Documento {
   processoId String
   processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
 
+  /** Auditoria de revisão humana obrigatória em documentos gerados por IA. */
+  revisadoPorUsuarioId String?
+  revisadoPorUsuario   Usuario?  @relation(fields: [revisadoPorUsuarioId], references: [id], onDelete: SetNull)
+  revisadoEm           DateTime?
+
   @@index([processoId])
+  @@index([revisadoPorUsuarioId])
 }
 
 model ModeloDocumento {
@@ -192,6 +198,7 @@ model Usuario {
   processosComoCoResponsavel Processo[] @relation("ProcessoCoResponsavel")
   comentariosProcesso        ProcessoComentario[]
   tarefasCriadas             ProcessoTarefa[] @relation("ProcessoTarefaCriador")
+  documentosRevisados        Documento[]
 }
 
 model Preferencia {

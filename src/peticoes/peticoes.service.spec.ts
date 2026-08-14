@@ -124,17 +124,53 @@ describe('PeticoesService', () => {
 
   it('salvarRascunho delega para DocumentosService', async () => {
     documentos.criarDocumentoDeTexto.mockResolvedValue({ id: 'd1' });
-    const doc = await service.salvarRascunho({
-      processoId: 'p1',
-      nomeArquivo: 'Petição - Caso.pdf',
-      texto: 'conteúdo',
-      revisaoConfirmada: true,
-    });
+    const doc = await service.salvarRascunho(
+      {
+        processoId: 'p1',
+        nomeArquivo: 'Petição - Caso.pdf',
+        texto: 'conteúdo',
+        revisaoConfirmada: true,
+      },
+      'u1',
+    );
     expect(doc).toEqual({ id: 'd1' });
     expect(documentos.criarDocumentoDeTexto).toHaveBeenCalledWith(
       'p1',
       'Petição - Caso.pdf',
       'conteúdo',
+      { usuarioId: 'u1', em: expect.any(Date) },
     );
+  });
+
+  it('salvarRascunho persiste quem revisou e quando (auditoria/LGPD)', async () => {
+    documentos.criarDocumentoDeTexto.mockResolvedValue({
+      id: 'd2',
+      revisadoPorUsuarioId: 'u2',
+      revisadoEm: new Date('2026-08-14T18:00:00.000Z'),
+    });
+
+    const before = Date.now();
+    const doc = await service.salvarRascunho(
+      {
+        processoId: 'p1',
+        nomeArquivo: 'Contestação.pdf',
+        texto: 'conteúdo revisado',
+        revisaoConfirmada: true,
+      },
+      'u2',
+    );
+    const after = Date.now();
+
+    expect(doc).toEqual(
+      expect.objectContaining({ id: 'd2', revisadoPorUsuarioId: 'u2' }),
+    );
+    const revisao = documentos.criarDocumentoDeTexto.mock.calls[0][3] as {
+      usuarioId: string;
+      em: Date;
+    };
+    expect(revisao.usuarioId).toBe('u2');
+    expect(revisao.em).toBeInstanceOf(Date);
+    expect(revisao.em.getTime()).toBeGreaterThanOrEqual(before);
+    expect(revisao.em.getTime()).toBeLessThanOrEqual(after);
   });
 });

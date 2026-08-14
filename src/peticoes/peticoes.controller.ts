@@ -44,7 +44,7 @@ export class PeticoesController {
     @CurrentUser() ator: AuditActor & CasoAcessoUser,
   ) {
     await this.casoAcesso.assertPodeVer(ator, dados.processoId);
-    const doc = await this.service.salvarRascunho(dados);
+    const doc = await this.service.salvarRascunho(dados, ator.id);
     await this.auditoria.registrar({
       acao: 'CRIAR',
       entidade: 'DOCUMENTO',

@@ -59,11 +59,16 @@ describe('PeticoesController', () => {
       texto: 'texto',
       revisaoConfirmada: true as const,
     };
-    const ator = { id: 'u1', role: Role.ADVOGADO, nome: 'Ana', email: 'a@x.com' };
+    const ator = {
+      id: 'u1',
+      role: Role.ADVOGADO,
+      nome: 'Ana',
+      email: 'a@x.com',
+    };
     await expect(controller.salvar(dto, ator)).resolves.toEqual({
       id: 'd1',
       nome: 'doc.pdf',
     });
-    expect(service.salvarRascunho).toHaveBeenCalledWith(dto);
+    expect(service.salvarRascunho).toHaveBeenCalledWith(dto, 'u1');
   });
 });

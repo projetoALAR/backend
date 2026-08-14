@@ -103,11 +103,13 @@ export class PeticoesService {
     return { texto, tokensUsados };
   }
 
-  async salvarRascunho(dados: SalvarRascunhoDto) {
+  /** `usuarioId` é quem confirmou a revisão humana (persistido para auditoria/LGPD). */
+  async salvarRascunho(dados: SalvarRascunhoDto, usuarioId: string) {
     return this.documentos.criarDocumentoDeTexto(
       dados.processoId,
       dados.nomeArquivo,
       dados.texto,
+      { usuarioId, em: new Date() },
     );
   }
 }

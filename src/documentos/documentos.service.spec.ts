@@ -194,6 +194,64 @@ describe('DocumentosService', () => {
     expect(upload).toHaveBeenCalled();
   });
 
+  it('persiste quem revisou e quando, quando informado', async () => {
+    prisma.processo.findUnique.mockResolvedValue({ id: 'p1' });
+    upload.mockResolvedValue({ error: null });
+    const revisadoEm = new Date('2026-08-14T18:00:00.000Z');
+    prisma.documento.create.mockResolvedValue({
+      id: 'd3',
+      nome: 'peticao.pdf',
+      urlArquivo: 'p1/peticao.pdf',
+      revisadoPorUsuarioId: 'u1',
+      revisadoEm,
+    });
+    createSignedUrl.mockResolvedValue({
+      data: { signedUrl: 'https://signed' },
+      error: null,
+    });
+
+    await expect(
+      criarServico().criarDocumentoDeTexto('p1', 'peticao', 'Olá, processo.', {
+        usuarioId: 'u1',
+        em: revisadoEm,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'd3',
+        revisadoPorUsuarioId: 'u1',
+        revisadoEm,
+      }),
+    );
+    expect(prisma.documento.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        revisadoPorUsuarioId: 'u1',
+        revisadoEm,
+      }),
+    });
+  });
+
+  it('sem revisão informada, grava os campos como null', async () => {
+    prisma.processo.findUnique.mockResolvedValue({ id: 'p1' });
+    upload.mockResolvedValue({ error: null });
+    prisma.documento.create.mockResolvedValue({
+      id: 'd4',
+      nome: 'peticao.pdf',
+      urlArquivo: 'p1/peticao.pdf',
+    });
+    createSignedUrl.mockResolvedValue({
+      data: { signedUrl: 'https://signed' },
+      error: null,
+    });
+
+    await criarServico().criarDocumentoDeTexto('p1', 'peticao', 'Texto.');
+    expect(prisma.documento.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        revisadoPorUsuarioId: null,
+        revisadoEm: null,
+      }),
+    });
+  });
+
   it('lista documentos do processo com URL assinada', async () => {
     prisma.documento.findMany.mockResolvedValue([
       { id: 'd1', urlArquivo: 'p1/a.pdf' },
