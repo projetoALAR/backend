@@ -29,7 +29,7 @@ export class AuditoriaService {
         data: {
           acao: input.acao,
           entidade: input.entidade,
-          entidadeId: input.entidadeId,
+          entidadeId: input.entidadeId ?? '-',
           resumo: input.resumo.slice(0, 500),
           usuarioId: input.ator?.id ?? null,
           usuarioNome: input.ator?.nome?.slice(0, 120) ?? null,

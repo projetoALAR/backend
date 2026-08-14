@@ -231,12 +231,70 @@ export class LlmService {
     });
   }
 
+  /**
+   * Extrai dados estruturados (JSON) de um documento (texto e/ou imagens).
+   * Usada para preencher formulários automaticamente — NUNCA deve inventar valores.
+   */
+  async extrairDadosEstruturados(
+    instrucao: string,
+    opcoes: { imagensUrls?: string[] } = {},
+  ): Promise<string> {
+    const apiKey = this.config.get<string>('OPENAI_API_KEY')?.trim();
+    if (!apiKey) {
+      if (this.isMockAllowed()) {
+        this.logger.warn(
+          'OPENAI_API_KEY ausente — CHAT_ALLOW_MOCK ativo (extração de dados demonstração)',
+        );
+        return '{}';
+      }
+      throw new ServiceUnavailableException(
+        'Extração de dados por IA indisponível: configure OPENAI_API_KEY ou defina CHAT_ALLOW_MOCK=true.',
+      );
+    }
+
+    const baseUrl =
+      this.config.get<string>('OPENAI_BASE_URL') || 'https://api.openai.com/v1';
+    const model = this.config.get<string>('OPENAI_MODEL') || 'gpt-4o-mini';
+
+    const systemPrompt = [
+      'Você extrai dados estruturados de documentos para preencher cadastros no sistema Alar.',
+      'Responda SOMENTE com um objeto JSON válido — nenhum texto antes ou depois do JSON.',
+      'NUNCA invente, adivinhe ou complete um valor que não esteja claramente legível no documento.',
+      'Quando não encontrar um campo com certeza, use o valor null para ele.',
+    ].join(' ');
+
+    const imagens = (opcoes.imagensUrls || []).slice(0, 4);
+    const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }];
+    if (imagens.length > 0) {
+      const parts: Array<ChatTextPart | ChatImagePart> = [
+        { type: 'text', text: instrucao },
+        ...imagens.map((url): ChatImagePart => ({
+          type: 'image_url',
+          image_url: { url, detail: 'high' },
+        })),
+      ];
+      messages.push({ role: 'user', content: parts });
+    } else {
+      messages.push({ role: 'user', content: instrucao });
+    }
+
+    const { content, tokensUsados } = await this.chamarChatCompletions(
+      apiKey,
+      baseUrl,
+      model,
+      messages,
+      { temperature: 0.1, responseFormat: { type: 'json_object' } },
+    );
+    this.logger.log(`Extração estruturada concluída (tokens=${tokensUsados})`);
+    return content;
+  }
+
   private async chamarChatCompletions(
     apiKey: string,
     baseUrl: string,
     model: string,
     messages: ChatMessage[],
-    opts: { temperature: number },
+    opts: { temperature: number; responseFormat?: { type: 'json_object' } },
   ): Promise<LlmResposta> {
     const textoEntrada = messages
       .map((m) =>
@@ -257,6 +315,9 @@ export class LlmService {
             model,
             temperature: opts.temperature,
             messages,
+            ...(opts.responseFormat
+              ? { response_format: opts.responseFormat }
+              : {}),
           }),
         },
       );
@@ -264,7 +325,10 @@ export class LlmService {
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         this.logger.error(`LLM HTTP ${response.status}: ${errText}`);
-        return { content: ERRO_LLM, tokensUsados: this.estimarTokens(textoEntrada) };
+        return {
+          content: ERRO_LLM,
+          tokensUsados: this.estimarTokens(textoEntrada),
+        };
       }
 
       const data = (await response.json()) as {
@@ -274,15 +338,20 @@ export class LlmService {
       const content = data.choices?.[0]?.message?.content?.trim();
       if (!content) {
         this.logger.warn('LLM retornou conteúdo vazio');
-        return { content: ERRO_LLM, tokensUsados: this.estimarTokens(textoEntrada) };
+        return {
+          content: ERRO_LLM,
+          tokensUsados: this.estimarTokens(textoEntrada),
+        };
       }
       const tokensUsados =
-        data.usage?.total_tokens ??
-        this.estimarTokens(textoEntrada + content);
+        data.usage?.total_tokens ?? this.estimarTokens(textoEntrada + content);
       return { content, tokensUsados };
     } catch (error) {
       this.logger.error('Falha ao chamar LLM', error as Error);
-      return { content: ERRO_LLM, tokensUsados: this.estimarTokens(textoEntrada) };
+      return {
+        content: ERRO_LLM,
+        tokensUsados: this.estimarTokens(textoEntrada),
+      };
     }
   }
 }

@@ -1,4 +1,9 @@
-export const AUDIT_ACOES = ['CRIAR', 'EDITAR', 'EXCLUIR'] as const;
+export const AUDIT_ACOES = [
+  'CRIAR',
+  'EDITAR',
+  'EXCLUIR',
+  'EXTRACAO_IA',
+] as const;
 export type AuditAcao = (typeof AUDIT_ACOES)[number];
 
 export const AUDIT_ENTIDADES = [
@@ -20,7 +25,8 @@ export type AuditActor = {
 export type RegistrarAuditInput = {
   acao: AuditAcao;
   entidade: AuditEntidade;
-  entidadeId: string;
+  /** Opcional quando a entidade ainda não existe (ex.: extração de IA antes de criar o registro). */
+  entidadeId?: string;
   resumo: string;
   ator?: AuditActor;
 };

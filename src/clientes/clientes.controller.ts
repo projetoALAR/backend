@@ -7,12 +7,23 @@ import {
   Delete,
   Param,
   ParseUUIDPipe,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import 'multer';
 import { ClientesService } from './clientes.service';
+import { ClientesExtracaoService } from './clientes-extracao.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
 import { CreateClienteDto, UpdateClienteDto } from './clientes.dto';
+import { DadosClienteExtraidos } from './clientes-extracao.dto';
 import { ClienteRespostaDto } from '../openapi/respostas.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -25,8 +36,31 @@ import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
 export class ClientesController {
   constructor(
     private readonly clientesService: ClientesService,
+    private readonly clientesExtracao: ClientesExtracaoService,
     private readonly auditoria: AuditoriaService,
   ) {}
+
+  /**
+   * Preenchimento automático a partir de documento (RG, CNH, contrato social...).
+   * O arquivo NUNCA é salvo — processado em memória e descartado após a extração.
+   */
+  @Roles(Role.ADMIN, Role.ADVOGADO)
+  @Post('extrair-dados')
+  @ApiCreatedResponse({ type: DadosClienteExtraidos })
+  @UseInterceptors(
+    FileInterceptor('arquivo', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
+  async extrairDados(
+    @UploadedFile() arquivo: Express.Multer.File,
+    @CurrentUser() ator: AuditActor & CasoAcessoUser,
+  ) {
+    return this.clientesExtracao.extrairDeArquivo(
+      arquivo,
+      ator.id,
+      ator.role,
+      ator,
+    );
+  }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Post()
