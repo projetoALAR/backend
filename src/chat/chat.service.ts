@@ -142,10 +142,11 @@ export class ChatService {
       },
     });
 
-    const historico = conversa.mensagens.map((m) => ({
-      role: m.isUser ? 'user' : 'assistant',
-      content: m.conteudo,
-    }));
+    const historico: { role: 'user' | 'assistant'; content: string }[] =
+      conversa.mensagens.map((m) => ({
+        role: m.isUser ? 'user' : 'assistant',
+        content: m.conteudo,
+      }));
 
     let resposta: string;
     let tokensUsados: number;
