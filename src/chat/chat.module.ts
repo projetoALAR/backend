@@ -10,7 +10,13 @@ import { DocumentosModule } from '../documentos/documentos.module';
 @Module({
   imports: [DocumentosModule],
   controllers: [ChatController],
-  providers: [ChatService, LlmService, ChatContextService, ChatQuotaService, PrismaService],
+  providers: [
+    ChatService,
+    LlmService,
+    ChatContextService,
+    ChatQuotaService,
+    PrismaService,
+  ],
   exports: [LlmService, ChatContextService, ChatQuotaService],
 })
 export class ChatModule {}

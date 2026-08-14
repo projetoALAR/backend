@@ -25,10 +25,7 @@ export class EquipeController {
 
   @Roles(Role.ADMIN)
   @Post()
-  async criar(
-    @Body() dados: CreateMembroDto,
-    @CurrentUser() ator: AuditActor,
-  ) {
+  async criar(@Body() dados: CreateMembroDto, @CurrentUser() ator: AuditActor) {
     const membro = await this.equipeService.criar(dados);
     if (membro.usuarioId) {
       await this.auditoria.registrar({

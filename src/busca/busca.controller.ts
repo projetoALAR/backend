@@ -20,6 +20,10 @@ export class BuscaController {
     @CurrentUser() user: CasoAcessoUser,
   ) {
     const limit = query.limit ? Number.parseInt(query.limit, 10) : 20;
-    return this.busca.buscar(user, query.q, Number.isFinite(limit) ? limit : 20);
+    return this.busca.buscar(
+      user,
+      query.q,
+      Number.isFinite(limit) ? limit : 20,
+    );
   }
 }

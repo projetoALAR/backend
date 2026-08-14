@@ -20,7 +20,11 @@ import {
 import { ProcessosService } from './processos.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
-import { CreateProcessoDto, UpdateProcessoDto, CreateProcessoComentarioDto } from './processos.dto';
+import {
+  CreateProcessoDto,
+  UpdateProcessoDto,
+  CreateProcessoComentarioDto,
+} from './processos.dto';
 import { ProcessoRespostaDto } from '../openapi/respostas.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';

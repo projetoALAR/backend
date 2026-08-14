@@ -29,9 +29,9 @@ describe('CasoAcessoService', () => {
       responsavelId: 'outro',
       coResponsavelId: null,
     });
-    await expect(service.assertPodeVer(assistente, 'p1')).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(
+      service.assertPodeVer(assistente, 'p1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('libera assistente atribuído e advogado em qualquer caso', async () => {
@@ -40,14 +40,18 @@ describe('CasoAcessoService', () => {
       responsavelId: 'a1',
       coResponsavelId: null,
     });
-    await expect(service.assertPodeVer(assistente, 'p1')).resolves.toBeUndefined();
-    await expect(service.assertPodeVer(advogado, 'p1')).resolves.toBeUndefined();
+    await expect(
+      service.assertPodeVer(assistente, 'p1'),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.assertPodeVer(advogado, 'p1'),
+    ).resolves.toBeUndefined();
   });
 
   it('404 se o processo não existe', async () => {
     prisma.processo.findUnique.mockResolvedValue(null);
-    await expect(service.assertPodeVer(advogado, 'missing')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.assertPodeVer(advogado, 'missing'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

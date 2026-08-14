@@ -26,11 +26,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.use(
-    helmet(
-      swaggerHabilitado()
-        ? { contentSecurityPolicy: false }
-        : undefined,
-    ),
+    helmet(swaggerHabilitado() ? { contentSecurityPolicy: false } : undefined),
   );
   configurarHttpApp(app);
 

@@ -74,7 +74,12 @@ export function preencherModelo(
       'cliente.telefone',
     ),
     '{{cliente.endereco}}': valorOuPendente(
-      [dados.cliente?.endereco, dados.cliente?.cidade, dados.cliente?.uf, dados.cliente?.cep]
+      [
+        dados.cliente?.endereco,
+        dados.cliente?.cidade,
+        dados.cliente?.uf,
+        dados.cliente?.cep,
+      ]
         .filter(Boolean)
         .join(', ') || null,
       'cliente.endereco',

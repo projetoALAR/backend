@@ -27,7 +27,10 @@ function escapeHtml(value: string): string {
 function corpoParaHtml(corpo: string): string {
   return escapeHtml(corpo)
     .split(/\n{2,}/)
-    .map((p) => `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${BRAND.text};">${p.replace(/\n/g, '<br/>')}</p>`)
+    .map(
+      (p) =>
+        `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${BRAND.text};">${p.replace(/\n/g, '<br/>')}</p>`,
+    )
     .join('');
 }
 
@@ -38,10 +41,19 @@ export function montarEmailAlar(opcoes: EmailTemplateOptions): {
 } {
   const { titulo, corpo, link, linkRotulo, appUrl } = opcoes;
   const appLink = appUrl || 'http://localhost:3000';
-  const ctaHref = link?.startsWith('http') ? link : link ? `${appLink.replace(/\/$/, '')}${link.startsWith('/') ? link : `/${link}`}` : appLink;
+  const ctaHref = link?.startsWith('http')
+    ? link
+    : link
+      ? `${appLink.replace(/\/$/, '')}${link.startsWith('/') ? link : `/${link}`}`
+      : appLink;
   const ctaLabel = linkRotulo || (link ? 'Abrir no Alar' : 'Acessar o Alar');
 
-  const text = [titulo, '', corpo, link ? `\n${ctaLabel}: ${ctaHref}` : `\n${appLink}`]
+  const text = [
+    titulo,
+    '',
+    corpo,
+    link ? `\n${ctaLabel}: ${ctaHref}` : `\n${appLink}`,
+  ]
     .filter(Boolean)
     .join('\n');
 

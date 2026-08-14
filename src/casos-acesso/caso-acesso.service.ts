@@ -20,10 +20,7 @@ export class CasoAcessoService {
   visibilidadeProcesso(user: CasoAcessoUser): Prisma.ProcessoWhereInput {
     if (!this.precisaFiltrar(user)) return {};
     return {
-      OR: [
-        { responsavelId: user.id },
-        { coResponsavelId: user.id },
-      ],
+      OR: [{ responsavelId: user.id }, { coResponsavelId: user.id }],
     };
   }
 
@@ -32,9 +29,7 @@ export class CasoAcessoService {
     return { processos: { some: this.visibilidadeProcesso(user) } };
   }
 
-  visibilidadeCompromisso(
-    user: CasoAcessoUser,
-  ): Prisma.CompromissoWhereInput {
+  visibilidadeCompromisso(user: CasoAcessoUser): Prisma.CompromissoWhereInput {
     if (!this.precisaFiltrar(user)) return {};
     return { processo: this.visibilidadeProcesso(user) };
   }

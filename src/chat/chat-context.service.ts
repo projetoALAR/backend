@@ -1,10 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { DocumentosService } from '../documentos/documentos.service';
-import {
-  type ChatFonte,
-  extrairTrechoRelevante,
-} from './chat-fonte.types';
+import { type ChatFonte, extrairTrechoRelevante } from './chat-fonte.types';
 
 export type CasoLlmAnexo = {
   textoContexto: string;

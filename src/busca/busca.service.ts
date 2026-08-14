@@ -50,14 +50,25 @@ export class BuscaService {
                 ...(q.includes('@')
                   ? [{ email: { contains: q, mode: 'insensitive' as const } }]
                   : []),
-                ...(digitos.length >= 3 ? [{ cpf: { contains: digitos } }] : []),
-                ...(digitos.length >= 3 ? [{ cnpj: { contains: digitos } }] : []),
+                ...(digitos.length >= 3
+                  ? [{ cpf: { contains: digitos } }]
+                  : []),
+                ...(digitos.length >= 3
+                  ? [{ cnpj: { contains: digitos } }]
+                  : []),
                 { nomeFantasia: { contains: q, mode: 'insensitive' as const } },
               ],
             },
           ],
         },
-        select: { id: true, nome: true, cpf: true, cnpj: true, tipo: true, email: true },
+        select: {
+          id: true,
+          nome: true,
+          cpf: true,
+          cnpj: true,
+          tipo: true,
+          email: true,
+        },
         orderBy: { nome: 'asc' },
         take: metade,
       }),

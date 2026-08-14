@@ -56,7 +56,9 @@ function rotuloFontes(fontes: unknown): string | null {
   return nomes.length > 0 ? nomes.join(', ') : null;
 }
 
-export function exportarConversaJson(conversa: ConversaExport): ChatExportResult {
+export function exportarConversaJson(
+  conversa: ConversaExport,
+): ChatExportResult {
   const slug = slugify(conversa.titulo) || 'conversa';
   const payload = {
     exportadoEm: new Date().toISOString(),
@@ -115,7 +117,12 @@ export function exportarConversaMarkdown(
 
   for (const msg of conversa.mensagens) {
     const autor = msg.isUser ? 'Você' : 'Assistente Alar';
-    linhas.push(`## ${formatarDataHora(msg.criadoEm)} — ${autor}`, '', msg.conteudo, '');
+    linhas.push(
+      `## ${formatarDataHora(msg.criadoEm)} — ${autor}`,
+      '',
+      msg.conteudo,
+      '',
+    );
     const fontes = rotuloFontes(msg.fontes);
     if (fontes) {
       linhas.push(`**Fontes consultadas:** ${fontes}`, '');

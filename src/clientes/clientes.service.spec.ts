@@ -25,7 +25,9 @@ describe('ClientesService', () => {
     service = new ClientesService(
       prisma as unknown as PrismaService,
       documentos as unknown as DocumentosService,
-      { visibilidadeCliente: jest.fn().mockReturnValue({}) } as unknown as CasoAcessoService,
+      {
+        visibilidadeCliente: jest.fn().mockReturnValue({}),
+      } as unknown as CasoAcessoService,
     );
   });
 

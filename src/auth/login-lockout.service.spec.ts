@@ -18,6 +18,8 @@ describe('LoginLockoutService', () => {
     for (let i = 0; i < 5; i++) {
       service.registerFailure('a@alar.com.br');
     }
-    expect(() => service.assertNotLocked('a@alar.com.br')).toThrow(HttpException);
+    expect(() => service.assertNotLocked('a@alar.com.br')).toThrow(
+      HttpException,
+    );
   });
 });

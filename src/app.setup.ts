@@ -1,4 +1,8 @@
-import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  VersioningType,
+} from '@nestjs/common';
 
 /** Versão URI padrão: rotas passam a /v1/... */
 export const API_DEFAULT_VERSION = '1';

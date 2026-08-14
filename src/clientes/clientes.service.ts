@@ -309,9 +309,10 @@ export class ClientesService {
           : (atual?.cidade ?? null),
       uf:
         dados.uf !== undefined
-          ? textoOuNulo(dados.uf)?.toUpperCase() ?? null
+          ? (textoOuNulo(dados.uf)?.toUpperCase() ?? null)
           : (atual?.uf ?? null),
-      cep: dados.cep !== undefined ? soDigitos(dados.cep) : (atual?.cep ?? null),
+      cep:
+        dados.cep !== undefined ? soDigitos(dados.cep) : (atual?.cep ?? null),
       observacoes:
         dados.observacoes !== undefined
           ? textoOuNulo(dados.observacoes)

@@ -92,7 +92,12 @@ export class ChatController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: EnviarMensagemDto,
   ) {
-    return this.chatService.enviarMensagem(id, body.conteudo, user.id, user.role);
+    return this.chatService.enviarMensagem(
+      id,
+      body.conteudo,
+      user.id,
+      user.role,
+    );
   }
 
   @Post('mensagens/:id/feedback')

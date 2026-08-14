@@ -130,8 +130,8 @@ describe('ProcessosTarefasService', () => {
       atualizadoEm: agora,
       criadoPor: null,
     });
-    await expect(service.remover(processoId, 't1', user)).resolves.toMatchObject(
-      { id: 't1' },
-    );
+    await expect(
+      service.remover(processoId, 't1', user),
+    ).resolves.toMatchObject({ id: 't1' });
   });
 });

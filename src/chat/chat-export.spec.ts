@@ -20,7 +20,9 @@ describe('chat-export', () => {
         conteudo: 'Há audiência em 15 dias.',
         isUser: false,
         criadoEm: new Date('2026-08-12T10:06:00'),
-        fontes: [{ nome: 'peticao.pdf', documentoId: 'd1', tipo: 'pdf', trecho: null }],
+        fontes: [
+          { nome: 'peticao.pdf', documentoId: 'd1', tipo: 'pdf', trecho: null },
+        ],
         feedback: 'util',
         tokensUsados: 120,
       },

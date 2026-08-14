@@ -9,18 +9,20 @@ import {
 /** Helvetica do PDFKit não cobre acentuação PT. */
 function textoPdf(valor?: string | null): string {
   if (!valor) return '-';
-  return valor
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .split('')
-    .map((ch) => {
-      const code = ch.charCodeAt(0);
-      if (ch === '\n' || ch === '\r' || ch === '\t') return ch;
-      if (code >= 0x20 && code <= 0x7e) return ch;
-      return '';
-    })
-    .join('')
-    .trim() || '-';
+  return (
+    valor
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .split('')
+      .map((ch) => {
+        const code = ch.charCodeAt(0);
+        if (ch === '\n' || ch === '\r' || ch === '\t') return ch;
+        if (code >= 0x20 && code <= 0x7e) return ch;
+        return '';
+      })
+      .join('')
+      .trim() || '-'
+  );
 }
 
 function dataPt(valor?: Date | string | null): string {
@@ -35,7 +37,10 @@ function dataPt(valor?: Date | string | null): string {
 }
 
 function nomeArquivo(numero: string): string {
-  const limpo = numero.replace(/[^\w.-]+/g, '-').replace(/-+/g, '-').slice(0, 40);
+  const limpo = numero
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 40);
   return `capa-${limpo || 'caso'}.pdf`;
 }
 
@@ -104,12 +109,19 @@ export class ProcessosCapaService {
       doc.on('error', reject);
 
       const linha = (rotulo: string, valor?: string | null) => {
-        doc.font('Helvetica-Bold').fontSize(9).text(textoPdf(rotulo), { continued: true });
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(9)
+          .text(textoPdf(rotulo), { continued: true });
         doc.font('Helvetica').text(`  ${textoPdf(valor)}`);
       };
 
       doc.font('Helvetica-Bold').fontSize(16).text('ALAR');
-      doc.font('Helvetica').fontSize(9).fillColor('#555555').text('Gestao juridica');
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#555555')
+        .text('Gestao juridica');
       doc.fillColor('#000000').moveDown(0.4);
       doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
       doc.moveDown(0.8);
@@ -130,7 +142,10 @@ export class ProcessosCapaService {
       const cliente = processo.cliente;
       if (cliente) {
         linha('Nome:', cliente.nome);
-        linha('Tipo:', cliente.tipo === 'PJ' ? 'Pessoa juridica' : 'Pessoa fisica');
+        linha(
+          'Tipo:',
+          cliente.tipo === 'PJ' ? 'Pessoa juridica' : 'Pessoa fisica',
+        );
         linha(
           cliente.tipo === 'PJ' ? 'CNPJ:' : 'CPF:',
           cliente.tipo === 'PJ' ? cliente.cnpj : cliente.cpf,
@@ -164,27 +179,40 @@ export class ProcessosCapaService {
       doc.font('Helvetica-Bold').fontSize(11).text('Proximos compromissos');
       doc.moveDown(0.2);
       if (processo.compromissos.length === 0) {
-        doc.font('Helvetica').fontSize(9).text('Nenhum compromisso cadastrado.');
+        doc
+          .font('Helvetica')
+          .fontSize(9)
+          .text('Nenhum compromisso cadastrado.');
       } else {
         for (const item of processo.compromissos) {
           doc
             .font('Helvetica')
             .fontSize(9)
-            .text(`${textoPdf(dataPt(item.dataHora))}  -  ${textoPdf(item.titulo)}`);
+            .text(
+              `${textoPdf(dataPt(item.dataHora))}  -  ${textoPdf(item.titulo)}`,
+            );
         }
       }
       doc.moveDown(0.5);
 
-      doc.font('Helvetica-Bold').fontSize(11).text('Tarefas pendentes com prazo');
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(11)
+        .text('Tarefas pendentes com prazo');
       doc.moveDown(0.2);
       if (processo.tarefas.length === 0) {
-        doc.font('Helvetica').fontSize(9).text('Nenhuma tarefa pendente com data.');
+        doc
+          .font('Helvetica')
+          .fontSize(9)
+          .text('Nenhuma tarefa pendente com data.');
       } else {
         for (const item of processo.tarefas) {
           doc
             .font('Helvetica')
             .fontSize(9)
-            .text(`${textoPdf(dataPt(item.prazo))}  -  ${textoPdf(item.titulo)}`);
+            .text(
+              `${textoPdf(dataPt(item.prazo))}  -  ${textoPdf(item.titulo)}`,
+            );
         }
       }
 

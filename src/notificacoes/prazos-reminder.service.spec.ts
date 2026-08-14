@@ -1,4 +1,8 @@
-import { PrazosReminderService, diasAte, rotuloJanela } from './prazos-reminder.service';
+import {
+  PrazosReminderService,
+  diasAte,
+  rotuloJanela,
+} from './prazos-reminder.service';
 import { PrismaService } from '../prisma.service';
 import { NotificacoesService } from './notificacoes.service';
 

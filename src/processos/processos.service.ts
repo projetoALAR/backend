@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
@@ -43,7 +47,9 @@ export class ProcessosService {
 
   async criar(dados: CreateProcessoDto, atorId?: string) {
     const { responsavelId, coResponsavelId } = await this.resolverEquipe(
-      dados.responsavelId !== undefined ? dados.responsavelId : atorId ?? null,
+      dados.responsavelId !== undefined
+        ? dados.responsavelId
+        : (atorId ?? null),
       dados.coResponsavelId ?? null,
     );
 

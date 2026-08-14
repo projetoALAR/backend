@@ -55,9 +55,9 @@ describe('AndamentosController', () => {
   it('exclui andamento manual com auditoria', async () => {
     const removido = { id: 'a1', descricao: 'Protocolado' };
     andamentosService.removerManual.mockResolvedValue(removido);
-    await expect(
-      controller.removerManual('p1', 'a1', user),
-    ).resolves.toEqual(removido);
+    await expect(controller.removerManual('p1', 'a1', user)).resolves.toEqual(
+      removido,
+    );
     expect(auditoria.registrar).toHaveBeenCalledWith(
       expect.objectContaining({ acao: 'EXCLUIR', entidade: 'ANDAMENTO' }),
     );

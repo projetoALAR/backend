@@ -17,8 +17,7 @@ function inicioDoDia(data: Date): Date {
 }
 
 function diasAte(data: Date, referencia = new Date()): number {
-  const diff =
-    inicioDoDia(data).getTime() - inicioDoDia(referencia).getTime();
+  const diff = inicioDoDia(data).getTime() - inicioDoDia(referencia).getTime();
   return Math.round(diff / (24 * 60 * 60 * 1000));
 }
 
@@ -57,7 +56,9 @@ export class PrazosReminderService {
     for (const processo of processos) {
       if (!processo.prazo) continue;
       const dias = diasAte(processo.prazo, referencia);
-      if (!JANELAS_PROCESSO.includes(dias as (typeof JANELAS_PROCESSO)[number])) {
+      if (
+        !JANELAS_PROCESSO.includes(dias as (typeof JANELAS_PROCESSO)[number])
+      ) {
         continue;
       }
 
@@ -106,7 +107,9 @@ export class PrazosReminderService {
     for (const compromisso of compromissos) {
       const dias = diasAte(compromisso.dataHora, referencia);
       if (
-        !JANELAS_COMPROMISSO.includes(dias as (typeof JANELAS_COMPROMISSO)[number])
+        !JANELAS_COMPROMISSO.includes(
+          dias as (typeof JANELAS_COMPROMISSO)[number],
+        )
       ) {
         continue;
       }
@@ -145,8 +148,8 @@ export class PrazosReminderService {
     responsavelId: string | null | undefined,
     coResponsavelId: string | null | undefined,
   ): Promise<string[]> {
-    const ids = [responsavelId, coResponsavelId].filter(
-      (id): id is string => Boolean(id),
+    const ids = [responsavelId, coResponsavelId].filter((id): id is string =>
+      Boolean(id),
     );
     if (ids.length > 0) {
       return [...new Set(ids)];

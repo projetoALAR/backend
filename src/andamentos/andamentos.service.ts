@@ -147,7 +147,7 @@ export class AndamentosService {
         origem: {
           tipo: 'manual',
           usuarioId: atorId ?? null,
-        } as Prisma.InputJsonValue,
+        },
       },
     });
 
@@ -386,7 +386,7 @@ export class AndamentosService {
   ) {
     await this.prisma.processo.update({
       where: { id: processoId },
-      data: { andamentosConsulta: snapshot as Prisma.InputJsonValue },
+      data: { andamentosConsulta: snapshot },
     });
   }
 

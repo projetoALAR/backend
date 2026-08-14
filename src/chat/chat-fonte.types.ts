@@ -29,10 +29,7 @@ export function extrairTrechoRelevante(
   let bestScore = 0;
   for (let i = 0; i < lower.length; i += 80) {
     const chunk = lower.slice(i, i + 400);
-    const score = palavras.reduce(
-      (s, w) => s + (chunk.includes(w) ? 1 : 0),
-      0,
-    );
+    const score = palavras.reduce((s, w) => s + (chunk.includes(w) ? 1 : 0), 0);
     if (score > bestScore) {
       bestScore = score;
       bestIdx = i;

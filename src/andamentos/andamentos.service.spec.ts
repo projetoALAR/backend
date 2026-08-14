@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AndamentosService } from './andamentos.service';
 import { AndamentosProvider } from './andamentos-provider';
 import { PrismaService } from '../prisma.service';
@@ -247,7 +251,9 @@ describe('AndamentosService', () => {
       id: 'a1',
       manual: true,
     });
-    expect(prisma.andamento.delete).toHaveBeenCalledWith({ where: { id: 'a1' } });
+    expect(prisma.andamento.delete).toHaveBeenCalledWith({
+      where: { id: 'a1' },
+    });
   });
 
   it('removerManual bloqueia andamento do tribunal', async () => {

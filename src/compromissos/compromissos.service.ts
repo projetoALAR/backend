@@ -63,7 +63,11 @@ export class CompromissosService {
     });
   }
 
-  async atualizar(id: string, dados: UpdateCompromissoDto, user: CasoAcessoUser) {
+  async atualizar(
+    id: string,
+    dados: UpdateCompromissoDto,
+    user: CasoAcessoUser,
+  ) {
     const atual = await this.prisma.compromisso.findUnique({ where: { id } });
     if (atual?.processoId) {
       await this.casoAcesso.assertPodeVer(user, atual.processoId);
