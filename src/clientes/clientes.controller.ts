@@ -9,6 +9,9 @@ import {
   ParseUUIDPipe,
   UploadedFile,
   UseInterceptors,
+  Header,
+  BadRequestException,
+  StreamableFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -60,6 +63,102 @@ export class ClientesController {
       ator.role,
       ator,
     );
+  }
+
+  /** Modelo Excel (.xlsx) para migração / onboarding de escritório. */
+  @Roles(Role.ADMIN, Role.ADVOGADO)
+  @Get('importacao/modelo')
+  @Header(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="modelo-clientes-alar.xlsx"',
+  )
+  async modeloImportacao() {
+    const buffer = await this.clientesService.modeloXlsx();
+    return new StreamableFile(buffer);
+  }
+
+  /**
+   * Lê cabeçalhos da planilha e sugere mapeamento para os campos Alar.
+   */
+  @Roles(Role.ADMIN, Role.ADVOGADO)
+  @Post('importar/preview')
+  @UseInterceptors(
+    FileInterceptor('arquivo', { limits: { fileSize: 2 * 1024 * 1024 } }),
+  )
+  async previewImportacao(@UploadedFile() arquivo: Express.Multer.File) {
+    if (!arquivo?.buffer?.length) {
+      throw new BadRequestException(
+        'Envie um arquivo Excel (.xlsx) ou CSV no campo "arquivo".',
+      );
+    }
+    return this.clientesService.previewArquivo(
+      arquivo.buffer,
+      arquivo.originalname || 'arquivo.xlsx',
+      arquivo.mimetype,
+    );
+  }
+
+  /**
+   * Importa lote de clientes via Excel ou CSV (até 500 linhas).
+   * Campo opcional `mapeamento` (JSON): { "0": "nome", "1": "cpf", ... }.
+   */
+  @Roles(Role.ADMIN, Role.ADVOGADO)
+  @Post('importar')
+  @UseInterceptors(
+    FileInterceptor('arquivo', { limits: { fileSize: 2 * 1024 * 1024 } }),
+  )
+  async importar(
+    @UploadedFile() arquivo: Express.Multer.File,
+    @CurrentUser() ator: AuditActor,
+    @Body('mapeamento') mapeamentoRaw?: string,
+  ) {
+    if (!arquivo?.buffer?.length) {
+      throw new BadRequestException(
+        'Envie um arquivo Excel (.xlsx) ou CSV no campo "arquivo".',
+      );
+    }
+    const nome = (arquivo.originalname || '').toLowerCase();
+    const mime = (arquivo.mimetype || '').toLowerCase();
+    const ok =
+      nome.endsWith('.xlsx') ||
+      nome.endsWith('.csv') ||
+      mime.includes('spreadsheet') ||
+      mime.includes('csv') ||
+      mime === 'text/plain' ||
+      mime === 'application/vnd.ms-excel';
+    if (!ok) {
+      throw new BadRequestException('Envie um arquivo .xlsx ou .csv.');
+    }
+
+    let mapeamento: Record<string, string | null> | undefined;
+    if (mapeamentoRaw?.trim()) {
+      try {
+        mapeamento = JSON.parse(mapeamentoRaw) as Record<
+          string,
+          string | null
+        >;
+      } catch {
+        throw new BadRequestException('mapeamento JSON inválido.');
+      }
+    }
+
+    const resultado = await this.clientesService.importarArquivo(
+      arquivo.buffer,
+      arquivo.originalname || 'arquivo.xlsx',
+      arquivo.mimetype,
+      mapeamento,
+    );
+    await this.auditoria.registrar({
+      acao: 'CRIAR',
+      entidade: 'CLIENTE',
+      resumo: `Importação: ${resultado.criados} criado(s), ${resultado.duplicados} duplicado(s), ${resultado.erros} erro(s) de ${resultado.total} linha(s)`,
+      ator,
+    });
+    return resultado;
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)

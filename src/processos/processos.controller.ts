@@ -9,7 +9,11 @@ import {
   ParseUUIDPipe,
   StreamableFile,
   Header,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -17,6 +21,7 @@ import {
   ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
+import 'multer';
 import { ProcessosService } from './processos.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/roles';
@@ -43,6 +48,103 @@ export class ProcessosController {
     private readonly timeline: ProcessosTimelineService,
     private readonly capa: ProcessosCapaService,
   ) {}
+
+  /** Modelo Excel (.xlsx) para migração de casos — vincular por CPF/CNPJ do cliente. */
+  @Roles(Role.ADMIN, Role.ADVOGADO)
+  @Get('importacao/modelo')
+  @Header(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="modelo-casos-alar.xlsx"',
+  )
+  async modeloImportacao() {
+    const buffer = await this.processosService.modeloXlsxImportacao();
+    return new StreamableFile(buffer);
+  }
+
+  /**
+   * Lê cabeçalhos da planilha e sugere mapeamento para os campos Alar.
+   */
+  @Roles(Role.ADMIN, Role.ADVOGADO)
+  @Post('importar/preview')
+  @UseInterceptors(
+    FileInterceptor('arquivo', { limits: { fileSize: 2 * 1024 * 1024 } }),
+  )
+  async previewImportacao(@UploadedFile() arquivo: Express.Multer.File) {
+    if (!arquivo?.buffer?.length) {
+      throw new BadRequestException(
+        'Envie um arquivo Excel (.xlsx) ou CSV no campo "arquivo".',
+      );
+    }
+    return this.processosService.previewArquivo(
+      arquivo.buffer,
+      arquivo.originalname || 'arquivo.xlsx',
+      arquivo.mimetype,
+    );
+  }
+
+  /**
+   * Importa lote de casos via Excel ou CSV (até 500 linhas).
+   * Campo opcional `mapeamento` (JSON): { "0": "numero", "1": "clienteCpf", ... }.
+   */
+  @Roles(Role.ADMIN, Role.ADVOGADO)
+  @Post('importar')
+  @UseInterceptors(
+    FileInterceptor('arquivo', { limits: { fileSize: 2 * 1024 * 1024 } }),
+  )
+  async importar(
+    @UploadedFile() arquivo: Express.Multer.File,
+    @CurrentUser() ator: AuditActor,
+    @Body('mapeamento') mapeamentoRaw?: string,
+  ) {
+    if (!arquivo?.buffer?.length) {
+      throw new BadRequestException(
+        'Envie um arquivo Excel (.xlsx) ou CSV no campo "arquivo".',
+      );
+    }
+    const nome = (arquivo.originalname || '').toLowerCase();
+    const mime = (arquivo.mimetype || '').toLowerCase();
+    const ok =
+      nome.endsWith('.xlsx') ||
+      nome.endsWith('.csv') ||
+      mime.includes('spreadsheet') ||
+      mime.includes('csv') ||
+      mime === 'text/plain' ||
+      mime === 'application/vnd.ms-excel';
+    if (!ok) {
+      throw new BadRequestException('Envie um arquivo .xlsx ou .csv.');
+    }
+
+    let mapeamento: Record<string, string | null> | undefined;
+    if (mapeamentoRaw?.trim()) {
+      try {
+        mapeamento = JSON.parse(mapeamentoRaw) as Record<
+          string,
+          string | null
+        >;
+      } catch {
+        throw new BadRequestException('mapeamento JSON inválido.');
+      }
+    }
+
+    const resultado = await this.processosService.importarArquivo(
+      arquivo.buffer,
+      arquivo.originalname || 'arquivo.xlsx',
+      arquivo.mimetype,
+      ator?.id,
+      mapeamento,
+    );
+    await this.auditoria.registrar({
+      acao: 'CRIAR',
+      entidade: 'PROCESSO',
+      resumo: `Importação: ${resultado.criados} criado(s), ${resultado.duplicados} duplicado(s), ${resultado.erros} erro(s) de ${resultado.total} linha(s)`,
+      ator,
+    });
+    return resultado;
+  }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Post()

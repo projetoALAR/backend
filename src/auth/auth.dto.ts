@@ -52,10 +52,30 @@ export class CreateUserDto {
 }
 
 export class ChangePasswordDto {
+  /** Obrigatória, exceto quando mustChangePassword=true. */
+  @IsOptional()
   @IsString()
   @MinLength(1, { message: 'Senha atual obrigatória' })
-  senhaAtual!: string;
+  senhaAtual?: string;
 
+  @IsString()
+  @IsSenhaForte()
+  novaSenha!: string;
+}
+
+export class ForgotPasswordDto {
+  @ApiProperty()
+  @IsEmail({}, { message: 'E-mail inválido' })
+  email!: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(20)
+  token!: string;
+
+  @ApiProperty()
   @IsString()
   @IsSenhaForte()
   novaSenha!: string;

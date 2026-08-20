@@ -306,4 +306,9 @@ export class UsuarioAuthDto {
 
   @ApiPropertyOptional()
   totpEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Se true, o usuário deve trocar a senha antes de usar o app',
+  })
+  mustChangePassword?: boolean;
 }

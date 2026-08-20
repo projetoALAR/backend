@@ -9,6 +9,7 @@ import { resolveJwtSecret } from './jwt-secret';
 import { PrismaService } from '../prisma.service';
 import { DocumentosModule } from '../documentos/documentos.module';
 import { EquipeModule } from '../equipe/equipe.module';
+import { NotificacoesModule } from '../notificacoes/notificacoes.module';
 import { LoginLockoutService } from './login-lockout.service';
 import { TotpService } from './totp.service';
 
@@ -16,6 +17,7 @@ import { TotpService } from './totp.service';
   imports: [
     DocumentosModule,
     EquipeModule,
+    NotificacoesModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

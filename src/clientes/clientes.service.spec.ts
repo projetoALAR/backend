@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ClientesService } from './clientes.service';
 import { PrismaService } from '../prisma.service';
 import { DocumentosService } from '../documentos/documentos.service';
@@ -163,5 +164,38 @@ describe('ClientesService', () => {
         }),
       }),
     );
+  });
+
+  it('importarCsv cria PF e PJ do modelo', async () => {
+    prisma.cliente.create
+      .mockResolvedValueOnce({ id: 'c1', nome: 'Marina Souza Lima' })
+      .mockResolvedValueOnce({ id: 'c2', nome: 'Horizonte Atacado Ltda' });
+
+    const resultado = await service.importarCsv(service.modeloCsv());
+    expect(resultado.criados).toBe(2);
+    expect(resultado.erros).toBe(0);
+    expect(resultado.duplicados).toBe(0);
+    expect(prisma.cliente.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('importarCsv marca duplicado no banco sem parar o lote', async () => {
+    prisma.cliente.create
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('unique', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      )
+      .mockResolvedValueOnce({ id: 'c2', nome: 'Beta Ltda' });
+
+    const csv = [
+      'nome,tipo,cpf,cnpj',
+      'Ana,PF,12345678901,',
+      'Beta Ltda,PJ,,12345678000199',
+    ].join('\n');
+    const resultado = await service.importarCsv(csv);
+    expect(resultado.duplicados).toBe(1);
+    expect(resultado.criados).toBe(1);
+    expect(resultado.erros).toBe(0);
   });
 });

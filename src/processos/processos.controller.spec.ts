@@ -16,6 +16,10 @@ describe('ProcessosController', () => {
     buscarPorId: jest.fn(),
     atualizar: jest.fn(),
     remover: jest.fn(),
+    modeloCsvImportacao: jest.fn().mockReturnValue('numero,status\n'),
+    modeloXlsxImportacao: jest.fn().mockResolvedValue(Buffer.from('xlsx')),
+    importarCsv: jest.fn(),
+    importarArquivo: jest.fn(),
   };
   const auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
   const timeline = {
@@ -38,6 +42,40 @@ describe('ProcessosController', () => {
     }).compile();
 
     controller = module.get(ProcessosController);
+  });
+
+  it('importa arquivo e registra auditoria', async () => {
+    const resultado = {
+      total: 1,
+      criados: 1,
+      duplicados: 0,
+      erros: 0,
+      resultados: [],
+    };
+    processosService.importarArquivo.mockResolvedValue(resultado);
+    const arquivo = {
+      buffer: Buffer.from('numero,status,clienteCpf\n1,Em andamento,123\n'),
+      originalname: 'casos.csv',
+      mimetype: 'text/csv',
+    } as Express.Multer.File;
+
+    await expect(controller.importar(arquivo, ator)).resolves.toEqual(
+      resultado,
+    );
+    expect(processosService.importarArquivo).toHaveBeenCalledWith(
+      arquivo.buffer,
+      'casos.csv',
+      'text/csv',
+      'u1',
+      undefined,
+    );
+    expect(auditoria.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        acao: 'CRIAR',
+        entidade: 'PROCESSO',
+        resumo: expect.stringContaining('Importação'),
+      }),
+    );
   });
 
   it('cria caso e registra auditoria', async () => {

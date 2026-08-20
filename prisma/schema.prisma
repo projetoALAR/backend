@@ -187,6 +187,10 @@ model Usuario {
   totpPendingSecret  String?
   totpEnabled        Boolean  @default(false)
   totpRecoveryHashes String[] @default([])
+  /** Obriga troca de senha no próximo login (import/convite). */
+  mustChangePassword Boolean  @default(false)
+  passwordResetToken String?
+  passwordResetExpires DateTime?
   criadoEm           DateTime @default(now())
 
   preferencia  Preferencia?

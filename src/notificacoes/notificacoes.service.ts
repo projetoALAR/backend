@@ -87,7 +87,30 @@ export class NotificacoesService {
     const to = usuario?.email;
     if (!to) return { skipped: true };
 
+    return this.enviarEmailTransacional({
+      para: to,
+      assunto,
+      titulo: assunto,
+      corpo: texto,
+      link,
+    });
+  }
+
+  /**
+   * E-mail transacional (convite, reset de senha) — ignora preferência de opt-out.
+   */
+  async enviarEmailTransacional(opcoes: {
+    para: string;
+    assunto: string;
+    titulo: string;
+    corpo: string;
+    link?: string;
+    linkRotulo?: string;
+  }): Promise<{ sent?: boolean; queuedInboxOnly?: boolean; skipped?: boolean }> {
     if (!this.transporter) {
+      this.logger.warn(
+        `SMTP ausente — e-mail transacional não enviado para ${opcoes.para}`,
+      );
       return { queuedInboxOnly: true };
     }
 
@@ -97,25 +120,30 @@ export class NotificacoesService {
       'noreply@alar.local';
 
     const { html, text } = montarEmailAlar({
-      titulo: assunto,
-      corpo: texto,
-      link,
+      titulo: opcoes.titulo,
+      corpo: opcoes.corpo,
+      link: opcoes.link,
+      linkRotulo: opcoes.linkRotulo,
       appUrl: this.appUrl(),
     });
 
     try {
       await this.transporter.sendMail({
         from,
-        to,
-        subject: `[Alar] ${assunto}`,
+        to: opcoes.para,
+        subject: `[Alar] ${opcoes.assunto}`,
         text,
         html,
       });
       return { sent: true };
     } catch (error) {
-      this.logger.error('Falha ao enviar e-mail', error as Error);
+      this.logger.error('Falha ao enviar e-mail transacional', error as Error);
       return { sent: false };
     }
+  }
+
+  appPublicUrl(): string {
+    return this.appUrl();
   }
 
   async notificarTodosUsuarios(

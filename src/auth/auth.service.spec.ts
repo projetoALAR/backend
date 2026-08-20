@@ -14,11 +14,18 @@ import { EquipeService } from '../equipe/equipe.service';
 import { Role } from './roles';
 import { LoginLockoutService } from './login-lockout.service';
 import { TotpService } from './totp.service';
+import { NotificacoesService } from '../notificacoes/notificacoes.service';
 
 jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
   hash: jest.fn(),
 }));
+
+const notificacoesMock = {
+  enviarEmailTransacional: jest.fn().mockResolvedValue(undefined),
+  appPublicUrl: jest.fn().mockReturnValue('http://localhost:3000'),
+  criarInbox: jest.fn().mockResolvedValue(undefined),
+} as unknown as NotificacoesService;
 
 describe('AuthService.changePassword', () => {
   let service: AuthService;
@@ -41,6 +48,7 @@ describe('AuthService.changePassword', () => {
       equipe as unknown as EquipeService,
       new LoginLockoutService(),
       new TotpService(),
+      notificacoesMock,
     );
   });
 
@@ -83,7 +91,12 @@ describe('AuthService.changePassword', () => {
 
     expect(prisma.usuario.update).toHaveBeenCalledWith({
       where: { id: 'u1' },
-      data: { senhaHash: 'hash-novo' },
+      data: {
+        senhaHash: 'hash-novo',
+        mustChangePassword: false,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
     });
   });
 
@@ -130,6 +143,7 @@ describe('AuthService.createUserByAdmin', () => {
       equipe as unknown as EquipeService,
       new LoginLockoutService(),
       new TotpService(),
+      notificacoesMock,
     );
 
     const result = await service.createUserByAdmin({
@@ -174,6 +188,7 @@ describe('AuthService.login lockout', () => {
       { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
       lockout,
       new TotpService(),
+      notificacoesMock,
     );
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
@@ -215,6 +230,7 @@ describe('AuthService.login 2FA', () => {
       { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
       new LoginLockoutService(),
       new TotpService(),
+      notificacoesMock,
     );
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
@@ -255,6 +271,7 @@ describe('AuthService.login 2FA', () => {
       { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
       new LoginLockoutService(),
       new TotpService(),
+      notificacoesMock,
     );
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
@@ -279,6 +296,7 @@ describe('AuthService.login 2FA', () => {
       { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
       new LoginLockoutService(),
       new TotpService(),
+      notificacoesMock,
     );
 
     await expect(
@@ -317,6 +335,7 @@ describe('AuthService.login 2FA', () => {
       { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
       new LoginLockoutService(),
       { verifyCode: jest.fn().mockReturnValue(true) } as unknown as TotpService,
+      notificacoesMock,
     );
 
     await expect(
@@ -340,6 +359,7 @@ describe('AuthService 2FA setup', () => {
     { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
     new LoginLockoutService(),
     new TotpService(),
+    notificacoesMock,
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -379,6 +399,7 @@ describe('AuthService.adminDisableTwoFactor', () => {
     { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
     new LoginLockoutService(),
     new TotpService(),
+    notificacoesMock,
   );
 
   beforeEach(() => jest.clearAllMocks());
