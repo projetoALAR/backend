@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -9,7 +10,9 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /** CNJ oficial ou código interno do escritório (1–80 chars). */
@@ -181,4 +184,70 @@ export class UpdateProcessoTarefaDto {
   @IsOptional()
   @IsDateString()
   prazo?: string | null;
+}
+
+export class LinhaRelatorioPdfDto {
+  @ApiProperty({ example: '0001234-56.2026.8.26.0100' })
+  @IsString()
+  @MaxLength(120)
+  numero!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  titulo?: string;
+
+  @ApiProperty({ example: 'Em andamento' })
+  @IsString()
+  @MaxLength(80)
+  status!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  prioridade?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  prazo?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  situacao?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  cliente?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  responsavel?: string;
+}
+
+/** PDF do recorte já filtrado no front (máx. 500 linhas). */
+export class GerarRelatorioPdfDto {
+  @ApiPropertyOptional({
+    example: 'status=Em andamento; prazoDe=2026-08-01',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  filtrosResumo?: string;
+
+  @ApiProperty({ type: [LinhaRelatorioPdfDto] })
+  @IsArray()
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => LinhaRelatorioPdfDto)
+  linhas!: LinhaRelatorioPdfDto[];
 }

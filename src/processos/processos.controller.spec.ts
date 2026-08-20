@@ -5,6 +5,7 @@ import { ProcessosService } from './processos.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ProcessosTimelineService } from './processos-timeline.service';
 import { ProcessosCapaService } from './processos-capa.service';
+import { ProcessosRelatorioPdfService } from './processos-relatorio-pdf.service';
 import { Role } from '../auth/roles';
 
 describe('ProcessosController', () => {
@@ -27,6 +28,7 @@ describe('ProcessosController', () => {
     comentar: jest.fn(),
   };
   const capa = { gerar: jest.fn() };
+  const relatorioPdf = { gerar: jest.fn() };
   const ator = { id: 'u1', role: Role.ADVOGADO };
 
   beforeEach(async () => {
@@ -38,6 +40,7 @@ describe('ProcessosController', () => {
         { provide: AuditoriaService, useValue: auditoria },
         { provide: ProcessosTimelineService, useValue: timeline },
         { provide: ProcessosCapaService, useValue: capa },
+        { provide: ProcessosRelatorioPdfService, useValue: relatorioPdf },
       ],
     }).compile();
 
@@ -111,6 +114,20 @@ describe('ProcessosController', () => {
     const arquivo = await controller.baixarCapa('p1', ator);
     expect(arquivo).toBeInstanceOf(StreamableFile);
     expect(capa.gerar).toHaveBeenCalledWith('p1', ator);
+  });
+
+  it('devolve PDF do relatório', async () => {
+    relatorioPdf.gerar.mockResolvedValue({
+      buffer: Buffer.from('%PDF-1.4'),
+      filename: 'relatorio-casos.pdf',
+    });
+    const body = {
+      filtrosResumo: 'status=Em andamento',
+      linhas: [{ numero: '1', status: 'Em andamento' }],
+    };
+    const arquivo = await controller.baixarRelatorioPdf(body);
+    expect(arquivo).toBeInstanceOf(StreamableFile);
+    expect(relatorioPdf.gerar).toHaveBeenCalledWith(body);
   });
 
   it('delega timeline e comentário', async () => {

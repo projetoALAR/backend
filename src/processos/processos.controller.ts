@@ -29,12 +29,14 @@ import {
   CreateProcessoDto,
   UpdateProcessoDto,
   CreateProcessoComentarioDto,
+  GerarRelatorioPdfDto,
 } from './processos.dto';
 import { ProcessoRespostaDto } from '../openapi/respostas.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ProcessosTimelineService } from './processos-timeline.service';
 import { ProcessosCapaService } from './processos-capa.service';
+import { ProcessosRelatorioPdfService } from './processos-relatorio-pdf.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
 import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
 
@@ -47,6 +49,7 @@ export class ProcessosController {
     private readonly auditoria: AuditoriaService,
     private readonly timeline: ProcessosTimelineService,
     private readonly capa: ProcessosCapaService,
+    private readonly relatorioPdf: ProcessosRelatorioPdfService,
   ) {}
 
   /** Modelo Excel (.xlsx) para migração de casos — vincular por CPF/CNPJ do cliente. */
@@ -144,6 +147,21 @@ export class ProcessosController {
       ator,
     });
     return resultado;
+  }
+
+  /**
+   * PDF do relatório de casos — admin envia o recorte já filtrado no front.
+   */
+  @Roles(Role.ADMIN)
+  @Post('relatorio/pdf')
+  @Header('Content-Type', 'application/pdf')
+  @ApiProduces('application/pdf')
+  async baixarRelatorioPdf(@Body() body: GerarRelatorioPdfDto) {
+    const { buffer, filename } = await this.relatorioPdf.gerar(body);
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${filename}"`,
+    });
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
