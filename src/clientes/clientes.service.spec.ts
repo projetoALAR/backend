@@ -198,4 +198,13 @@ describe('ClientesService', () => {
     expect(resultado.criados).toBe(1);
     expect(resultado.erros).toBe(0);
   });
+
+  it('importarArquivo rejeita mapeamento sem nome', async () => {
+    const csv = 'ColA,ColB\nAna,x\n';
+    await expect(
+      service.importarArquivo(Buffer.from(csv, 'utf8'), 'c.csv', 'text/csv', {
+        '0': 'email',
+      }),
+    ).rejects.toThrow(/Nome/);
+  });
 });
