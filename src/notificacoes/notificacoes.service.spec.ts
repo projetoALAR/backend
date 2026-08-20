@@ -3,9 +3,11 @@ import { NotificacoesService } from './notificacoes.service';
 import { PrismaService } from '../prisma.service';
 
 const sendMail = jest.fn();
+const getTestMessageUrl = jest.fn();
 
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(() => ({ sendMail })),
+  getTestMessageUrl: (...args: unknown[]) => getTestMessageUrl(...args),
 }));
 
 function criarConfig(valores: Record<string, string> = {}): ConfigService {
@@ -84,7 +86,19 @@ describe('NotificacoesService', () => {
       expect(criarServico().statusEmail()).toEqual(
         expect.objectContaining({
           smtpConfigured: false,
+          smtpHost: null,
           appUrl: 'http://localhost:3000',
+        }),
+      );
+    });
+
+    it('enviarEmailTeste sem SMTP devolve queuedInboxOnly', async () => {
+      await expect(
+        criarServico().enviarEmailTeste('admin@alar.com.br'),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          queuedInboxOnly: true,
+          para: 'admin@alar.com.br',
         }),
       );
     });
@@ -207,6 +221,7 @@ describe('NotificacoesService', () => {
       prisma.preferencia.findUnique.mockResolvedValue(null);
       prisma.usuario.findUnique.mockResolvedValue({ email: 'a@alar.com.br' });
       sendMail.mockResolvedValue({});
+      getTestMessageUrl.mockReturnValue(false);
 
       await expect(
         criarServico().enviarEmailSeAtivo('u1', 'Assunto', 'Texto'),
@@ -214,6 +229,19 @@ describe('NotificacoesService', () => {
       expect(sendMail).toHaveBeenCalledWith(
         expect.objectContaining({ to: 'a@alar.com.br' }),
       );
+    });
+
+    it('inclui etherealPreviewUrl quando o transporte é Ethereal', async () => {
+      sendMail.mockResolvedValue({ messageId: 'x' });
+      getTestMessageUrl.mockReturnValue('https://ethereal.email/message/abc');
+
+      await expect(
+        criarServico().enviarEmailTeste('admin@alar.com.br'),
+      ).resolves.toEqual({
+        sent: true,
+        etherealPreviewUrl: 'https://ethereal.email/message/abc',
+        para: 'admin@alar.com.br',
+      });
     });
 
     it('devolve sent:false quando o transporter falha', async () => {

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -99,5 +100,21 @@ export class InboxController {
   @Get('sistema/email-status')
   emailStatus() {
     return this.notificacoes.statusEmail();
+  }
+
+  /**
+   * Envia e-mail de teste para o próprio admin logado.
+   * Com Ethereal, a resposta pode incluir `etherealPreviewUrl`.
+   */
+  @Roles(Role.ADMIN)
+  @Post('sistema/email-teste')
+  async emailTeste(@CurrentUser() user: { id: string; email?: string | null }) {
+    const para = user.email?.trim();
+    if (!para) {
+      throw new BadRequestException(
+        'Seu usuário não tem e-mail cadastrado para o teste.',
+      );
+    }
+    return this.notificacoes.enviarEmailTeste(para);
   }
 }
