@@ -211,23 +211,15 @@ export class ProcessosService {
     let linhas: LinhaImportacaoProcesso[];
     try {
       if (mapeamento && Object.keys(mapeamento).length > 0) {
-        const erroMap = validarMapeamento(mapeamento, [...CAMPOS_ALVO_PROCESSOS]);
+        const erroMap = validarMapeamento(mapeamento, [...CAMPOS_ALVO_PROCESSOS], {
+          exigirUmDe: [
+            {
+              chaves: ['clienteCpf', 'clienteCnpj', 'clienteDocumento'],
+              rotulo: 'CPF, CNPJ ou Documento do cliente',
+            },
+          ],
+        });
         if (erroMap) throw new BadRequestException(erroMap);
-        const usados = new Set(
-          Object.values(mapeamento).filter((v): v is string => !!v),
-        );
-        if (!usados.has('numero')) {
-          throw new BadRequestException('Mapeie a coluna Número do processo.');
-        }
-        if (
-          !usados.has('clienteCpf') &&
-          !usados.has('clienteCnpj') &&
-          !usados.has('clienteDocumento')
-        ) {
-          throw new BadRequestException(
-            'Mapeie CPF, CNPJ ou Documento do cliente.',
-          );
-        }
         const tabela = await lerTabelaDeArquivo(buffer, nomeArquivo, mime);
         linhas = aplicarMapeamento<LinhaImportacaoProcesso>(
           tabela,

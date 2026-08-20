@@ -106,12 +106,28 @@ export class NotificacoesService {
     corpo: string;
     link?: string;
     linkRotulo?: string;
-  }): Promise<{ sent?: boolean; queuedInboxOnly?: boolean; skipped?: boolean }> {
+  }): Promise<{
+    sent?: boolean;
+    queuedInboxOnly?: boolean;
+    skipped?: boolean;
+    /** Só em desenvolvimento e sem SMTP — para testar fluxos localmente. */
+    devPreviewLink?: string;
+  }> {
     if (!this.transporter) {
       this.logger.warn(
         `SMTP ausente — e-mail transacional não enviado para ${opcoes.para}`,
       );
-      return { queuedInboxOnly: true };
+      if (opcoes.link) {
+        this.logger.warn(
+          `[dev] Link do e-mail "${opcoes.assunto}": ${opcoes.link}`,
+        );
+      }
+      const allowDevLink =
+        process.env.NODE_ENV !== 'production' && Boolean(opcoes.link);
+      return {
+        queuedInboxOnly: true,
+        ...(allowDevLink ? { devPreviewLink: opcoes.link } : {}),
+      };
     }
 
     const from =
@@ -140,6 +156,19 @@ export class NotificacoesService {
       this.logger.error('Falha ao enviar e-mail transacional', error as Error);
       return { sent: false };
     }
+  }
+
+  /** Status seguro para admin (sem secrets). */
+  statusEmail(): {
+    smtpConfigured: boolean;
+    appUrl: string;
+    environment: string;
+  } {
+    return {
+      smtpConfigured: Boolean(this.transporter),
+      appUrl: this.appUrl(),
+      environment: process.env.NODE_ENV || 'development',
+    };
   }
 
   appPublicUrl(): string {

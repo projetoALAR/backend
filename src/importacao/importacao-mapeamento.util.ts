@@ -159,18 +159,24 @@ export function mapeamentoDasSugestoes(
 export function validarMapeamento(
   mapeamento: MapeamentoColunas,
   camposAlvo: CampoAlvoImportacao[],
+  opcoes?: {
+    /** Cada grupo exige pelo menos um campo mapeado. */
+    exigirUmDe?: Array<{ chaves: string[]; rotulo: string }>;
+  },
 ): string | null {
   const usados = new Set(
     Object.values(mapeamento).filter((v): v is string => !!v),
   );
   for (const campo of camposAlvo) {
     if (!campo.obrigatorio) continue;
-    if (campo.documentoFlexivel) {
-      // coberto por documento OU pelos campos cpf/cnpj específicos
-      continue;
-    }
+    if (campo.documentoFlexivel) continue;
     if (!usados.has(campo.chave)) {
       return `Mapeie a coluna obrigatória: ${campo.rotulo}`;
+    }
+  }
+  for (const grupo of opcoes?.exigirUmDe ?? []) {
+    if (!grupo.chaves.some((k) => usados.has(k))) {
+      return `Mapeie ao menos uma coluna: ${grupo.rotulo}`;
     }
   }
   return null;

@@ -2,9 +2,11 @@ import {
   aplicarMapeamento,
   montarPreview,
   mapeamentoDasSugestoes,
+  validarMapeamento,
 } from './importacao-mapeamento.util';
 import { sugerirColunaCliente } from '../clientes/clientes-importacao.util';
 import { CAMPOS_ALVO_CLIENTES } from '../clientes/clientes-importacao.util';
+import { CAMPOS_ALVO_PROCESSOS } from '../processos/processos-importacao.util';
 
 describe('importacao-mapeamento.util', () => {
   it('sugere colunas de planilha genérica e aplica mapeamento', () => {
@@ -41,5 +43,35 @@ describe('importacao-mapeamento.util', () => {
       nome: 'Beta Ltda',
       cnpj: '12.345.678/0001-95',
     });
+  });
+
+  it('validarMapeamento exige campos obrigatórios', () => {
+    expect(
+      validarMapeamento({ '0': 'email' }, [...CAMPOS_ALVO_CLIENTES]),
+    ).toMatch(/Nome/);
+    expect(
+      validarMapeamento({ '0': 'nome' }, [...CAMPOS_ALVO_CLIENTES]),
+    ).toBeNull();
+  });
+
+  it('validarMapeamento exigeUmDe para documento do cliente no caso', () => {
+    const op = {
+      exigirUmDe: [
+        {
+          chaves: ['clienteCpf', 'clienteCnpj', 'clienteDocumento'],
+          rotulo: 'CPF, CNPJ ou Documento do cliente',
+        },
+      ],
+    };
+    expect(
+      validarMapeamento({ '0': 'numero' }, [...CAMPOS_ALVO_PROCESSOS], op),
+    ).toMatch(/CPF, CNPJ ou Documento/);
+    expect(
+      validarMapeamento(
+        { '0': 'numero', '1': 'clienteDocumento' },
+        [...CAMPOS_ALVO_PROCESSOS],
+        op,
+      ),
+    ).toBeNull();
   });
 });

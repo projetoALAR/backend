@@ -59,6 +59,36 @@ describe('NotificacoesService', () => {
       expect(sendMail).not.toHaveBeenCalled();
     });
 
+    it('enviarEmailTransacional devolve devPreviewLink fora de production', async () => {
+      const prev = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      try {
+        await expect(
+          criarServico().enviarEmailTransacional({
+            para: 'a@alar.com.br',
+            assunto: 'Reset',
+            titulo: 'Reset',
+            corpo: 'Corpo',
+            link: 'http://localhost:3000/redefinir-senha?token=abc',
+          }),
+        ).resolves.toEqual({
+          queuedInboxOnly: true,
+          devPreviewLink: 'http://localhost:3000/redefinir-senha?token=abc',
+        });
+      } finally {
+        process.env.NODE_ENV = prev;
+      }
+    });
+
+    it('statusEmail reporta smtpConfigured=false sem transporter', () => {
+      expect(criarServico().statusEmail()).toEqual(
+        expect.objectContaining({
+          smtpConfigured: false,
+          appUrl: 'http://localhost:3000',
+        }),
+      );
+    });
+
     it('enviarEmailSeAtivo pula quando a preferência de e-mail está desativada', async () => {
       prisma.preferencia.findUnique.mockResolvedValue({
         notificacoes: { email: false },

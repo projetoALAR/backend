@@ -264,12 +264,6 @@ export class EquipeService {
       if (mapeamento && Object.keys(mapeamento).length > 0) {
         const erroMap = validarMapeamento(mapeamento, [...CAMPOS_ALVO_EQUIPE]);
         if (erroMap) throw new BadRequestException(erroMap);
-        const usados = new Set(
-          Object.values(mapeamento).filter((v): v is string => !!v),
-        );
-        if (!usados.has('nome') || !usados.has('email')) {
-          throw new BadRequestException('Mapeie Nome e E-mail.');
-        }
         linhas = aplicarMapeamento<LinhaImportacaoEquipe>(tabela, mapeamento);
       } else {
         linhas = linhasDeTabelaEquipe(tabela);

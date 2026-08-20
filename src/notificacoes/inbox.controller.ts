@@ -93,4 +93,11 @@ export class InboxController {
       take: 30,
     });
   }
+
+  /** Status de e-mail transacional (SMTP + APP_URL) — só admin. */
+  @Roles(Role.ADMIN)
+  @Get('sistema/email-status')
+  emailStatus() {
+    return this.notificacoes.statusEmail();
+  }
 }

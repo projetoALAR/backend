@@ -391,7 +391,7 @@ export class AuthService implements OnModuleInit {
     const base = this.notificacoes.appPublicUrl().replace(/\/$/, '');
     const link = `${base}/redefinir-senha?token=${token}`;
 
-    await this.notificacoes.enviarEmailTransacional({
+    const emailResult = await this.notificacoes.enviarEmailTransacional({
       para: usuario.email,
       assunto: 'Redefinir senha',
       titulo: 'Redefinir senha',
@@ -405,7 +405,12 @@ export class AuthService implements OnModuleInit {
       linkRotulo: 'Escolher nova senha',
     });
 
-    return { ok: true };
+    return {
+      ok: true as const,
+      ...(emailResult.devPreviewLink
+        ? { devResetLink: emailResult.devPreviewLink }
+        : {}),
+    };
   }
 
   async resetPassword(token: string, novaSenha: string) {

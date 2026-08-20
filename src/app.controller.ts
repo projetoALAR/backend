@@ -36,6 +36,12 @@ export class AppController {
         database: 'up',
         timestamp: new Date().toISOString(),
         sentry: Boolean(process.env.SENTRY_DSN?.trim()),
+        smtp: Boolean(
+          process.env.SMTP_HOST?.trim() &&
+            process.env.SMTP_USER?.trim() &&
+            process.env.SMTP_PASS?.trim(),
+        ),
+        appUrl: Boolean(process.env.APP_URL?.trim()),
       };
     } catch {
       throw new ServiceUnavailableException({
