@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
+  NotFoundException,
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -373,9 +374,76 @@ export class AuthService implements OnModuleInit {
     const email = emailRaw.trim().toLowerCase();
     const usuario = await this.prisma.usuario.findUnique({ where: { email } });
     if (!usuario) {
-      return { ok: true };
+      return { ok: true as const };
+    }
+    return this.emitirLinkResetSenha(usuario, {
+      assunto: 'Redefinir senha',
+      titulo: 'Redefinir senha',
+      corpo: [
+        `Olá, ${usuario.nome}.`,
+        '',
+        'Recebemos um pedido para redefinir sua senha no Alar.',
+        'O link expira em 1 hora. Se você não pediu isso, ignore este e-mail.',
+      ].join('\n'),
+    });
+  }
+
+  /** Admin: envia link de redefinição para um usuário conhecido. */
+  async adminEnviarLinkReset(userId: string) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+    });
+    if (!usuario) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: { mustChangePassword: true },
+    });
+    return this.emitirLinkResetSenha(usuario, {
+      assunto: 'Redefinir senha (pedido do administrador)',
+      titulo: 'Redefinir senha',
+      corpo: [
+        `Olá, ${usuario.nome}.`,
+        '',
+        'Um administrador do Alar pediu que você defina uma nova senha.',
+        'O link expira em 1 hora.',
+      ].join('\n'),
+    });
+  }
+
+  /** Admin: define senha temporária e marca troca obrigatória. */
+  async adminDefinirSenhaTemporaria(userId: string, senha: string) {
+    assertSenhaForte(senha);
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+    });
+    if (!usuario) {
+      throw new NotFoundException('Usuário não encontrado');
     }
 
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        senhaHash: await bcrypt.hash(senha, 10),
+        mustChangePassword: true,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+
+    await this.enviarConviteAcesso(
+      { id: usuario.id, nome: usuario.nome, email: usuario.email },
+      senha,
+    );
+
+    return { ok: true as const };
+  }
+
+  private async emitirLinkResetSenha(
+    usuario: { id: string; nome: string; email: string },
+    email: { assunto: string; titulo: string; corpo: string },
+  ) {
     const token = randomBytes(32).toString('hex');
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const expires = new Date(Date.now() + 60 * 60 * 1000); // 1h
@@ -393,14 +461,9 @@ export class AuthService implements OnModuleInit {
 
     const emailResult = await this.notificacoes.enviarEmailTransacional({
       para: usuario.email,
-      assunto: 'Redefinir senha',
-      titulo: 'Redefinir senha',
-      corpo: [
-        `Olá, ${usuario.nome}.`,
-        '',
-        'Recebemos um pedido para redefinir sua senha no Alar.',
-        'O link expira em 1 hora. Se você não pediu isso, ignore este e-mail.',
-      ].join('\n'),
+      assunto: email.assunto,
+      titulo: email.titulo,
+      corpo: email.corpo,
       link,
       linkRotulo: 'Escolher nova senha',
     });
@@ -449,11 +512,19 @@ export class AuthService implements OnModuleInit {
         role: true,
         fotoUrl: true,
         criadoEm: true,
+        mustChangePassword: true,
+        totpEnabled: true,
       },
     });
     return Promise.all(
       usuarios.map(async (u) => ({
-        ...u,
+        id: u.id,
+        nome: u.nome,
+        email: u.email,
+        role: u.role,
+        criadoEm: u.criadoEm,
+        mustChangePassword: !!u.mustChangePassword,
+        totpEnabled: !!u.totpEnabled,
         fotoUrl: u.fotoUrl
           ? await this.documentos.resolveSignedUrl(u.fotoUrl)
           : null,

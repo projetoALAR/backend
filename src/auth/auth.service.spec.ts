@@ -446,3 +446,66 @@ describe('AuthService.adminDisableTwoFactor', () => {
     );
   });
 });
+
+describe('AuthService admin senha', () => {
+  const prisma = {
+    usuario: { findUnique: jest.fn(), update: jest.fn() },
+  };
+  const service = new AuthService(
+    prisma as unknown as PrismaService,
+    {} as JwtService,
+    {} as ConfigService,
+    { resolveSignedUrl: jest.fn() } as unknown as DocumentosService,
+    { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
+    new LoginLockoutService(),
+    new TotpService(),
+    notificacoesMock,
+  );
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('adminEnviarLinkReset marca troca e envia e-mail', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u2',
+      nome: 'Ana',
+      email: 'ana@alar.com.br',
+    });
+    prisma.usuario.update.mockResolvedValue({});
+    ;(
+      notificacoesMock.enviarEmailTransacional as jest.Mock
+    ).mockResolvedValue({ queuedInboxOnly: true, devPreviewLink: 'http://x' });
+
+    const result = await service.adminEnviarLinkReset('u2');
+    expect(result.ok).toBe(true);
+    expect(result.devResetLink).toBe('http://x');
+    expect(prisma.usuario.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'u2' },
+        data: expect.objectContaining({ mustChangePassword: true }),
+      }),
+    );
+  });
+
+  it('adminDefinirSenhaTemporaria atualiza hash e convite', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u2',
+      nome: 'Ana',
+      email: 'ana@alar.com.br',
+    });
+    prisma.usuario.update.mockResolvedValue({});
+    ;(bcrypt.hash as jest.Mock).mockResolvedValue('hash-novo');
+
+    await expect(
+      service.adminDefinirSenhaTemporaria('u2', 'AlarTrocar123'),
+    ).resolves.toEqual({ ok: true });
+
+    expect(prisma.usuario.update).toHaveBeenCalledWith({
+      where: { id: 'u2' },
+      data: expect.objectContaining({
+        senhaHash: 'hash-novo',
+        mustChangePassword: true,
+      }),
+    });
+    expect(notificacoesMock.enviarEmailTransacional).toHaveBeenCalled();
+  });
+});

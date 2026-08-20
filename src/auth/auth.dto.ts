@@ -81,6 +81,13 @@ export class ResetPasswordDto {
   novaSenha!: string;
 }
 
+export class AdminSenhaTemporariaDto {
+  @ApiProperty()
+  @IsString()
+  @IsSenhaForte()
+  senha!: string;
+}
+
 export class Enable2faDto {
   @IsString()
   @MinLength(6, { message: 'Informe o código de 6 dígitos' })
