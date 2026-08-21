@@ -127,7 +127,7 @@ export const MODELO_CSV_CLIENTES =
       'Horizonte Atacado Ltda',
       'PJ',
       '',
-      '45.218.903/0001-00',
+      '45.218.903/0001-81',
       'Horizonte Atacado',
       '',
       'juridico@horizonte.demo',

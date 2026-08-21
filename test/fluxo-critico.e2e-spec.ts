@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { configurarHttpApp } from './../src/app.setup';
+import { cnjValidoDeSeed, cpfValidoDeSeed } from './helpers/documento-e2e';
 
 /**
  * Fluxo crítico: login → cliente → caso → chat.
@@ -74,7 +75,7 @@ describe('Fluxo crítico (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         nome: `Cliente E2E ${suffix}`,
-        cpf: `9${suffix.slice(-10)}`.padEnd(11, '0').slice(0, 11),
+        cpf: cpfValidoDeSeed(suffix),
         email: `e2e-${suffix}@alar.test`,
       });
 
@@ -86,7 +87,7 @@ describe('Fluxo crítico (e2e)', () => {
       .post('/v1/processos')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        numero: `E2E-${suffix}`,
+        numero: cnjValidoDeSeed(suffix),
         status: 'Em andamento',
         clienteId,
         titulo: `Caso E2E ${suffix}`,

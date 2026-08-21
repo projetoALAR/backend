@@ -39,6 +39,7 @@ import {
   type PreviewImportacao,
   validarMapeamento,
 } from '../importacao/importacao-mapeamento.util';
+import { validarDigitoCnj } from '../andamentos/datajud-tribunal.util';
 
 export const MAX_LINHAS_IMPORTACAO_PROCESSOS = 500;
 
@@ -134,6 +135,13 @@ export class ProcessosService {
     atorId?: string,
     opcoes?: { silencioso?: boolean },
   ) {
+    const numero = dados.numero.trim();
+    if (!validarDigitoCnj(numero)) {
+      throw new BadRequestException(
+        'Número CNJ inválido (confira os 20 dígitos e o dígito verificador)',
+      );
+    }
+
     const { responsavelId, coResponsavelId } = await this.resolverEquipe(
       dados.responsavelId !== undefined
         ? dados.responsavelId
@@ -143,7 +151,7 @@ export class ProcessosService {
 
     const processo = await this.prisma.processo.create({
       data: {
-        numero: dados.numero.trim(),
+        numero,
         status: dados.status,
         clienteId: dados.clienteId,
         titulo: dados.titulo,
@@ -297,6 +305,18 @@ export class ProcessosService {
           linha: linha.linha,
           status: 'erro',
           motivo: 'Número do processo obrigatório',
+        });
+        continue;
+      }
+
+      if (!validarDigitoCnj(numero)) {
+        erros += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'erro',
+          numero,
+          motivo:
+            'Número CNJ inválido (confira os 20 dígitos e o dígito verificador)',
         });
         continue;
       }
@@ -481,6 +501,11 @@ export class ProcessosService {
   async atualizar(id: string, dados: UpdateProcessoDto) {
     const numeroNovo =
       dados.numero !== undefined ? dados.numero.trim() : undefined;
+    if (numeroNovo !== undefined && !validarDigitoCnj(numeroNovo)) {
+      throw new BadRequestException(
+        'Número CNJ inválido (confira os 20 dígitos e o dígito verificador)',
+      );
+    }
 
     const equipe =
       dados.responsavelId !== undefined || dados.coResponsavelId !== undefined

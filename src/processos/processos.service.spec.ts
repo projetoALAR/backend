@@ -7,6 +7,9 @@ import { CasoAcessoService } from '../casos-acesso/caso-acesso.service';
 import { Role } from '../auth/roles';
 import { CreateProcessoDto, UpdateProcessoDto } from './processos.dto';
 
+const CNJ = '0000001-46.2024.8.26.0100';
+const CNJ_B = '0000002-41.2024.8.26.0100';
+
 describe('ProcessosService', () => {
   const prisma = {
     processo: {
@@ -42,7 +45,7 @@ describe('ProcessosService', () => {
     const criado = {
       id: 'p1',
       titulo: 'Caso',
-      numero: '1',
+      numero: CNJ,
       prazo: new Date('2026-09-01'),
     };
     prisma.processo.create.mockResolvedValue(criado);
@@ -50,7 +53,7 @@ describe('ProcessosService', () => {
     await expect(
       service.criar(
         {
-          numero: ' 1 ',
+          numero: ` ${CNJ} `,
           clienteId: 'c1',
           status: 'Em andamento',
           titulo: 'Caso',
@@ -68,12 +71,12 @@ describe('ProcessosService', () => {
     prisma.processo.create.mockResolvedValue({
       id: 'p1',
       titulo: 'Caso',
-      numero: '1',
+      numero: CNJ,
       prazo: new Date('2026-09-01'),
     });
     await service.criar(
       {
-        numero: '1',
+        numero: CNJ,
         clienteId: 'c1',
         status: 'Em andamento',
         titulo: 'Caso',
@@ -89,7 +92,7 @@ describe('ProcessosService', () => {
   it('rejeita responsável e co-responsável iguais', async () => {
     await expect(
       service.criar({
-        numero: '1',
+        numero: CNJ,
         clienteId: 'c1',
         status: 'Em andamento',
         titulo: 'Caso',
@@ -103,7 +106,7 @@ describe('ProcessosService', () => {
     prisma.usuario.findUnique.mockResolvedValue(null);
     await expect(
       service.criar({
-        numero: '1',
+        numero: CNJ,
         clienteId: 'c1',
         status: 'Em andamento',
         titulo: 'Caso',
@@ -136,7 +139,7 @@ describe('ProcessosService', () => {
 
     await expect(
       service.atualizar('p1', {
-        numero: ' 99 ',
+        numero: ` ${CNJ_B} `,
         prazo: null,
         coResponsavelId: 'u2',
       } satisfies UpdateProcessoDto),
@@ -145,7 +148,7 @@ describe('ProcessosService', () => {
       data: Record<string, unknown>;
     };
     expect(updateArg.data).toMatchObject({
-      numero: '99',
+      numero: CNJ_B,
       tribunalSigla: null,
       prazo: null,
       coResponsavelId: 'u2',
@@ -201,8 +204,8 @@ describe('ProcessosService', () => {
 
     const csv = [
       'numero,status,clienteCpf,clienteCnpj',
-      '111,Em andamento,12345678901,',
-      '222,Em andamento,,12345678000199',
+      '0000001-46.2024.8.26.0100,Em andamento,39053344705,',
+      '0000002-41.2024.8.26.0100,Em andamento,,11222333000181',
     ].join('\n');
     const resultado = await service.importarCsv(csv, 'u1');
     expect(resultado.duplicados).toBe(1);

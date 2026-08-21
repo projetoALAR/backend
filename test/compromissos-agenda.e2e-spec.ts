@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { configurarHttpApp } from './../src/app.setup';
+import { cnjValidoDeSeed, cpfValidoDeSeed } from './helpers/documento-e2e';
 
 /**
  * Agenda / Prazos: criar → listar (geral e por caso) → editar → excluir.
@@ -72,7 +73,7 @@ describe('Compromissos agenda/prazos (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         nome: `Cliente Agenda E2E ${suffix}`,
-        cpf: `8${suffix.slice(-10)}`.padEnd(11, '0').slice(0, 11),
+        cpf: cpfValidoDeSeed(`8${suffix}`),
         email: `agenda-e2e-${suffix}@alar.test`,
       });
 
@@ -84,7 +85,7 @@ describe('Compromissos agenda/prazos (e2e)', () => {
       .post('/v1/processos')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        numero: `AGE-${suffix}`,
+        numero: cnjValidoDeSeed(`age${suffix}`),
         status: 'Em andamento',
         clienteId,
         titulo: `Caso Agenda E2E ${suffix}`,

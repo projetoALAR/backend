@@ -133,7 +133,7 @@ export const MODELO_CSV_PROCESSOS =
       '22/08/2026',
       'Exemplo PJ — apague e use o CNPJ do cliente ja importado',
       '',
-      '45.218.903/0001-00',
+      '45.218.903/0001-81',
       'civel',
     ].join(';'),
   ].join('\r\n');

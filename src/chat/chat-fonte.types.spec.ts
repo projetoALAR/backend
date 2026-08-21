@@ -27,6 +27,21 @@ describe('chat-fonte', () => {
       'Conforme peticao.pdf, o pedido é...',
       fontes,
     );
-    expect(res.some((f) => f.nome === 'peticao.pdf')).toBe(true);
+    expect(res).toHaveLength(1);
+    expect(res[0]?.nome).toBe('peticao.pdf');
+  });
+
+  it('não anexa fontes só porque têm trecho, se o modelo não citou o nome', () => {
+    const fontes = [
+      {
+        documentoId: '1',
+        nome: 'contrato.pdf',
+        trecho: 'Cláusula 1',
+        tipo: 'pdf' as const,
+      },
+    ];
+    expect(
+      filtrarFontesCitadas('Resumo genérico sem citar arquivo.', fontes),
+    ).toEqual([]);
   });
 });

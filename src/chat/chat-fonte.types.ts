@@ -48,17 +48,14 @@ export function filtrarFontesCitadas(
   if (fontes.length === 0) return [];
 
   const respostaLower = resposta.toLowerCase();
+  // Só fontes citadas pelo nome (ex.: [contrato.pdf]) — sem fallback genérico.
   const mencionadas = fontes.filter((f) =>
     respostaLower.includes(f.nome.toLowerCase()),
   );
-  const comTrecho = fontes.filter((f) => f.trecho);
 
   const map = new Map<string, ChatFonte>();
-  for (const f of [...mencionadas, ...comTrecho]) {
+  for (const f of mencionadas) {
     map.set(f.documentoId, f);
   }
-
-  const picked = [...map.values()];
-  if (picked.length > 0) return picked.slice(0, 6);
-  return comTrecho.slice(0, 3);
+  return [...map.values()].slice(0, 6);
 }

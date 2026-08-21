@@ -38,6 +38,7 @@ import {
   type PreviewImportacao,
   validarMapeamento,
 } from '../importacao/importacao-mapeamento.util';
+import { validarCnpj, validarCpf } from '../common/documento-br.util';
 
 export const NOME_TITULAR_ANONIMIZADO = 'Titular anonimizado';
 export const MAX_LINHAS_IMPORTACAO_CLIENTES = 500;
@@ -530,8 +531,13 @@ export class ClientesService {
       if (!cpf || (!/^ANON/i.test(cpf) && cpf.length !== 11)) {
         throw new BadRequestException('CPF deve ter 11 dígitos');
       }
+      if (cpf && !/^ANON/i.test(cpf) && !validarCpf(cpf)) {
+        throw new BadRequestException('CPF inválido (dígito verificador)');
+      }
     } else if (!cnpj || cnpj.length !== 14) {
       throw new BadRequestException('CNPJ deve ter 14 dígitos');
+    } else if (!validarCnpj(cnpj)) {
+      throw new BadRequestException('CNPJ inválido (dígito verificador)');
     }
 
     const nome = dados.nome !== undefined ? dados.nome.trim() : atual?.nome;
