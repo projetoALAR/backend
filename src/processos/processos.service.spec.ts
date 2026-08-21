@@ -129,6 +129,23 @@ describe('ProcessosService', () => {
     expect(casoAcesso.visibilidadeProcesso).toHaveBeenCalledWith(user);
   });
 
+  it('lista processos paginados com total', async () => {
+    prisma.processo.findMany.mockResolvedValue([{ id: 'p1' }]);
+    prisma.processo.count = jest.fn().mockResolvedValue(1);
+    prisma.$transaction = jest
+      .fn()
+      .mockImplementation(async (ops: Promise<unknown>[]) => Promise.all(ops));
+
+    await expect(
+      service.listarTodos(user, { page: 1, limit: 12, q: 'silva' }),
+    ).resolves.toEqual({
+      items: [{ id: 'p1' }],
+      total: 1,
+      page: 1,
+      limit: 12,
+    });
+  });
+
   it('atualiza numero, prazo e equipe', async () => {
     prisma.processo.findUnique.mockResolvedValue({
       responsavelId: 'u1',

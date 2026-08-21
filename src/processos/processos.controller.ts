@@ -12,6 +12,7 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -39,6 +40,16 @@ import { ProcessosCapaService } from './processos-capa.service';
 import { ProcessosRelatorioPdfService } from './processos-relatorio-pdf.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
 import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
+import { ListarPaginadoQueryDto } from '../common/paginacao.dto';
+import { IsIn, IsOptional } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+
+class ListarProcessosQueryDto extends ListarPaginadoQueryDto {
+  @ApiPropertyOptional({ enum: ['ativos', 'concluidos'] })
+  @IsOptional()
+  @IsIn(['ativos', 'concluidos'])
+  situacao?: 'ativos' | 'concluidos';
+}
 
 @Controller('processos')
 @ApiTags('Processos')
@@ -195,8 +206,11 @@ export class ProcessosController {
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get()
   @ApiOkResponse({ type: ProcessoRespostaDto, isArray: true })
-  async listarTodos(@CurrentUser() user: CasoAcessoUser) {
-    return this.processosService.listarTodos(user);
+  async listarTodos(
+    @CurrentUser() user: CasoAcessoUser,
+    @Query() query: ListarProcessosQueryDto,
+  ) {
+    return this.processosService.listarTodos(user, query);
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)

@@ -102,7 +102,7 @@ describe('ProcessosController', () => {
     processosService.listarTodos.mockResolvedValue([]);
     processosService.buscarPorId.mockResolvedValue(processo);
     await expect(controller.listarPorCliente('c1', ator)).resolves.toEqual([]);
-    await expect(controller.listarTodos(ator)).resolves.toEqual([]);
+    await expect(controller.listarTodos(ator, {})).resolves.toEqual([]);
     await expect(controller.buscarPorId('p1', ator)).resolves.toEqual(processo);
   });
 

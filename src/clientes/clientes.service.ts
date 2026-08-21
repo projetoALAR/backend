@@ -39,6 +39,10 @@ import {
   validarMapeamento,
 } from '../importacao/importacao-mapeamento.util';
 import { validarCnpj, validarCpf } from '../common/documento-br.util';
+import {
+  normalizarPaginacao,
+  type PaginaResultado,
+} from '../common/paginacao.dto';
 
 export const NOME_TITULAR_ANONIMIZADO = 'Titular anonimizado';
 export const MAX_LINHAS_IMPORTACAO_CLIENTES = 500;
@@ -310,14 +314,62 @@ export class ClientesService {
     };
   }
 
-  async listarTodos(user: CasoAcessoUser) {
-    return this.prisma.cliente.findMany({
-      where: this.casoAcesso.visibilidadeCliente(user),
-      include: {
-        _count: { select: { processos: true } },
-      },
-      orderBy: { criadoEm: 'desc' },
-    });
+  async listarTodos(
+    user: CasoAcessoUser,
+    filtro?: { page?: number; limit?: number; q?: string },
+  ) {
+    const q = filtro?.q?.trim();
+    const digitos = q ? q.replace(/\D/g, '') : '';
+    const busca: Prisma.ClienteWhereInput | undefined = q
+      ? {
+          OR: [
+            { nome: { contains: q, mode: 'insensitive' } },
+            { nomeFantasia: { contains: q, mode: 'insensitive' } },
+            { email: { contains: q, mode: 'insensitive' } },
+            { cpf: { contains: q, mode: 'insensitive' } },
+            { cnpj: { contains: q, mode: 'insensitive' } },
+            { cidade: { contains: q, mode: 'insensitive' } },
+            ...(digitos.length >= 3
+              ? [
+                  { cpf: { contains: digitos } },
+                  { cnpj: { contains: digitos } },
+                ]
+              : []),
+          ],
+        }
+      : undefined;
+
+    const where: Prisma.ClienteWhereInput = {
+      AND: [
+        this.casoAcesso.visibilidadeCliente(user),
+        ...(busca ? [busca] : []),
+      ],
+    };
+
+    const include = {
+      _count: { select: { processos: true } },
+    } as const;
+    const orderBy = { criadoEm: 'desc' as const };
+    const { paginar, page, limit } = normalizarPaginacao(filtro);
+
+    if (!paginar) {
+      return this.prisma.cliente.findMany({ where, include, orderBy });
+    }
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.cliente.findMany({
+        where,
+        include,
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.cliente.count({ where }),
+    ]);
+
+    return { items, total, page, limit } satisfies PaginaResultado<
+      (typeof items)[number]
+    >;
   }
 
   async buscarPorId(id: string, user: CasoAcessoUser) {

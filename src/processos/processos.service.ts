@@ -40,6 +40,10 @@ import {
   validarMapeamento,
 } from '../importacao/importacao-mapeamento.util';
 import { validarDigitoCnj } from '../andamentos/datajud-tribunal.util';
+import {
+  normalizarPaginacao,
+  type PaginaResultado,
+} from '../common/paginacao.dto';
 
 export const MAX_LINHAS_IMPORTACAO_PROCESSOS = 500;
 
@@ -472,15 +476,71 @@ export class ProcessosService {
     });
   }
 
-  async listarTodos(user: CasoAcessoUser) {
-    return this.prisma.processo.findMany({
-      where: this.casoAcesso.visibilidadeProcesso(user),
-      include: {
-        ...processoInclude,
-        _count: { select: { documentos: true, compromissos: true } },
-      },
-      orderBy: { criadoEm: 'desc' },
-    });
+  async listarTodos(
+    user: CasoAcessoUser,
+    filtro?: {
+      page?: number;
+      limit?: number;
+      q?: string;
+      situacao?: 'ativos' | 'concluidos';
+    },
+  ) {
+    const q = filtro?.q?.trim();
+    const digitos = q ? q.replace(/\D/g, '') : '';
+    const busca: Prisma.ProcessoWhereInput | undefined = q
+      ? {
+          OR: [
+            { titulo: { contains: q, mode: 'insensitive' } },
+            { numero: { contains: q, mode: 'insensitive' } },
+            { status: { contains: q, mode: 'insensitive' } },
+            { cliente: { nome: { contains: q, mode: 'insensitive' } } },
+            ...(digitos.length >= 3
+              ? [{ numero: { contains: digitos } }]
+              : []),
+          ],
+        }
+      : undefined;
+
+    const situacaoWhere: Prisma.ProcessoWhereInput | undefined =
+      filtro?.situacao === 'ativos'
+        ? { concluido: false }
+        : filtro?.situacao === 'concluidos'
+          ? { concluido: true }
+          : undefined;
+
+    const where: Prisma.ProcessoWhereInput = {
+      AND: [
+        this.casoAcesso.visibilidadeProcesso(user),
+        ...(busca ? [busca] : []),
+        ...(situacaoWhere ? [situacaoWhere] : []),
+      ],
+    };
+
+    const include = {
+      ...processoInclude,
+      _count: { select: { documentos: true, compromissos: true } },
+    };
+    const orderBy = { criadoEm: 'desc' as const };
+    const { paginar, page, limit } = normalizarPaginacao(filtro);
+
+    if (!paginar) {
+      return this.prisma.processo.findMany({ where, include, orderBy });
+    }
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.processo.findMany({
+        where,
+        include,
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.processo.count({ where }),
+    ]);
+
+    return { items, total, page, limit } satisfies PaginaResultado<
+      (typeof items)[number]
+    >;
   }
 
   async buscarPorId(id: string, user: CasoAcessoUser) {

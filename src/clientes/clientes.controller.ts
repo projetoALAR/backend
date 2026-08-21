@@ -12,6 +12,7 @@ import {
   Header,
   BadRequestException,
   StreamableFile,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -32,6 +33,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
 import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
+import { ListarPaginadoQueryDto } from '../common/paginacao.dto';
 
 @Controller('clientes')
 @ApiTags('Clientes')
@@ -182,8 +184,11 @@ export class ClientesController {
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get()
   @ApiOkResponse({ type: ClienteRespostaDto, isArray: true })
-  async listarTodos(@CurrentUser() user: CasoAcessoUser) {
-    return this.clientesService.listarTodos(user);
+  async listarTodos(
+    @CurrentUser() user: CasoAcessoUser,
+    @Query() query: ListarPaginadoQueryDto,
+  ) {
+    return this.clientesService.listarTodos(user, query);
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)

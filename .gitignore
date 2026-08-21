@@ -42,6 +42,9 @@ lerna-debug.log*
 .env.production.local
 .env.local
 
+# Local DB dumps (npm run backup:smoke)
+/backups/
+
 # temp directory
 .temp
 .tmp
