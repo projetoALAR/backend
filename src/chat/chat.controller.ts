@@ -106,7 +106,12 @@ export class ChatController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: MensagemFeedbackDto,
   ) {
-    return this.chatService.registrarFeedback(id, user.id, body.util);
+    return this.chatService.registrarFeedback(
+      id,
+      user.id,
+      body.util,
+      body.motivo,
+    );
   }
 
   @Delete('conversas/:id')

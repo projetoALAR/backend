@@ -231,8 +231,18 @@ export class ChatService {
     return this.chatQuota.resumo(usuarioId, role);
   }
 
-  registrarFeedback(mensagemId: string, usuarioId: string, util: boolean) {
-    return this.chatQuota.registrarFeedback(mensagemId, usuarioId, util);
+  registrarFeedback(
+    mensagemId: string,
+    usuarioId: string,
+    util: boolean,
+    motivo?: string,
+  ) {
+    return this.chatQuota.registrarFeedback(
+      mensagemId,
+      usuarioId,
+      util,
+      motivo,
+    );
   }
 
   metricasAdmin() {

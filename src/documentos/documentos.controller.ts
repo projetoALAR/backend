@@ -73,6 +73,18 @@ export class DocumentosController {
     return this.documentosService.listarPorProcesso(processoId);
   }
 
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
+  @Get(':id')
+  @ApiOkResponse({ type: DocumentoRespostaDto })
+  async buscarPorId(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: CasoAcessoUser,
+  ) {
+    const doc = await this.documentosService.buscarPorId(id);
+    await this.casoAcesso.assertPodeVer(user, doc.processoId);
+    return doc;
+  }
+
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Delete(':id')
   @ApiOkResponse({ type: DocumentoRespostaDto })

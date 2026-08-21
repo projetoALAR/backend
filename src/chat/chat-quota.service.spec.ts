@@ -69,7 +69,7 @@ describe('ChatQuotaService', () => {
 
     expect(prisma.mensagem.update).toHaveBeenCalledWith({
       where: { id: 'm1' },
-      data: { feedback: 'util' },
+      data: { feedback: 'util', feedbackMotivo: null },
     });
   });
 });

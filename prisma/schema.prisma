@@ -269,6 +269,7 @@ model Mensagem {
   fontes        Json?
   tokensUsados  Int?
   feedback      String?
+  feedbackMotivo String?
   criadoEm      DateTime @default(now())
 
   conversacaoId String

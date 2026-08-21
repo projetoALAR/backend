@@ -31,6 +31,7 @@ import {
   UpdateProcessoDto,
   CreateProcessoComentarioDto,
   GerarRelatorioPdfDto,
+  ListarProcessosQueryDto,
 } from './processos.dto';
 import { ProcessoRespostaDto } from '../openapi/respostas.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -40,16 +41,6 @@ import { ProcessosCapaService } from './processos-capa.service';
 import { ProcessosRelatorioPdfService } from './processos-relatorio-pdf.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
 import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
-import { ListarPaginadoQueryDto } from '../common/paginacao.dto';
-import { IsIn, IsOptional } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-
-class ListarProcessosQueryDto extends ListarPaginadoQueryDto {
-  @ApiPropertyOptional({ enum: ['ativos', 'concluidos'] })
-  @IsOptional()
-  @IsIn(['ativos', 'concluidos'])
-  situacao?: 'ativos' | 'concluidos';
-}
 
 @Controller('processos')
 @ApiTags('Processos')

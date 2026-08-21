@@ -260,6 +260,17 @@ export class DocumentosService {
     return Promise.all(docs.map((d) => this.withSignedUrl(d)));
   }
 
+  async buscarPorId(id: string) {
+    const documento = await this.prisma.documento.findUnique({
+      where: { id },
+      include: { revisadoPorUsuario: { select: { nome: true } } },
+    });
+    if (!documento) {
+      throw new NotFoundException('Documento não encontrado.');
+    }
+    return this.withSignedUrl(documento);
+  }
+
   async remover(id: string) {
     const documento = await this.prisma.documento.findUnique({ where: { id } });
     if (!documento) {

@@ -12,8 +12,9 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ListarPaginadoQueryDto } from '../common/paginacao.dto';
 
 /** CNJ oficial ou código interno do escritório (1–80 chars). */
 const NUMERO_PROCESSO_REGEX =
@@ -250,4 +251,51 @@ export class GerarRelatorioPdfDto {
   @ValidateNested({ each: true })
   @Type(() => LinhaRelatorioPdfDto)
   linhas!: LinhaRelatorioPdfDto[];
+}
+
+function splitCsv(value: unknown): string[] | undefined {
+  if (value == null || value === '') return undefined;
+  if (Array.isArray(value)) {
+    return value.map(String).flatMap((v) => v.split(',')).map((s) => s.trim()).filter(Boolean);
+  }
+  return String(value)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Query de listagem paginada de processos (filtros do FilterModal). */
+export class ListarProcessosQueryDto extends ListarPaginadoQueryDto {
+  @ApiPropertyOptional({ enum: ['ativos', 'concluidos'] })
+  @IsOptional()
+  @IsIn(['ativos', 'concluidos'])
+  situacao?: 'ativos' | 'concluidos';
+
+  @ApiPropertyOptional({
+    description: 'Status (CSV ou repetido), ex.: Em andamento,Suspenso',
+  })
+  @IsOptional()
+  @Transform(({ value }) => splitCsv(value))
+  @IsArray()
+  @IsString({ each: true })
+  status?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Prioridades (CSV), ex.: Alta,Média',
+  })
+  @IsOptional()
+  @Transform(({ value }) => splitCsv(value))
+  @IsArray()
+  @IsString({ each: true })
+  prioridade?: string[];
+
+  @ApiPropertyOptional({ description: 'Prazo a partir de (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  prazoDe?: string;
+
+  @ApiPropertyOptional({ description: 'Prazo até (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  prazoAte?: string;
 }

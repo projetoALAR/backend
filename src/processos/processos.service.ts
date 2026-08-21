@@ -483,6 +483,10 @@ export class ProcessosService {
       limit?: number;
       q?: string;
       situacao?: 'ativos' | 'concluidos';
+      status?: string[];
+      prioridade?: string[];
+      prazoDe?: string;
+      prazoAte?: string;
     },
   ) {
     const q = filtro?.q?.trim();
@@ -508,11 +512,36 @@ export class ProcessosService {
           ? { concluido: true }
           : undefined;
 
+    const statusWhere: Prisma.ProcessoWhereInput | undefined =
+      filtro?.status && filtro.status.length > 0
+        ? { status: { in: filtro.status } }
+        : undefined;
+
+    const prioridadeWhere: Prisma.ProcessoWhereInput | undefined =
+      filtro?.prioridade && filtro.prioridade.length > 0
+        ? { prioridade: { in: filtro.prioridade } }
+        : undefined;
+
+    let prazoWhere: Prisma.ProcessoWhereInput | undefined;
+    if (filtro?.prazoDe || filtro?.prazoAte) {
+      const prazo: Prisma.DateTimeFilter = {};
+      if (filtro.prazoDe) {
+        prazo.gte = new Date(`${filtro.prazoDe}T00:00:00.000`);
+      }
+      if (filtro.prazoAte) {
+        prazo.lte = new Date(`${filtro.prazoAte}T23:59:59.999`);
+      }
+      prazoWhere = { prazo };
+    }
+
     const where: Prisma.ProcessoWhereInput = {
       AND: [
         this.casoAcesso.visibilidadeProcesso(user),
         ...(busca ? [busca] : []),
         ...(situacaoWhere ? [situacaoWhere] : []),
+        ...(statusWhere ? [statusWhere] : []),
+        ...(prioridadeWhere ? [prioridadeWhere] : []),
+        ...(prazoWhere ? [prazoWhere] : []),
       ],
     };
 

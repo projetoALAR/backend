@@ -82,6 +82,7 @@ export class ChatQuotaService {
     mensagemId: string,
     usuarioId: string,
     util: boolean,
+    motivo?: string,
   ) {
     const mensagem = await this.prisma.mensagem.findUnique({
       where: { id: mensagemId },
@@ -94,9 +95,13 @@ export class ChatQuotaService {
       throw new ForbiddenException('Você não pode avaliar esta mensagem.');
     }
 
+    const motivoLimpo = motivo?.trim() || null;
     return this.prisma.mensagem.update({
       where: { id: mensagemId },
-      data: { feedback: util ? 'util' : 'nao_util' },
+      data: {
+        feedback: util ? 'util' : 'nao_util',
+        feedbackMotivo: util ? null : motivoLimpo,
+      },
     });
   }
 
