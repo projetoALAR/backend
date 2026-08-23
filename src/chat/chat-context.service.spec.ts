@@ -21,6 +21,11 @@ describe('ChatContextService', () => {
     resolveSignedUrl: jest.fn(),
   };
 
+  const casoAcesso = {
+    visibilidadeProcesso: jest.fn().mockReturnValue({}),
+    visibilidadeCliente: jest.fn().mockReturnValue({}),
+  };
+
   let service: ChatContextService;
 
   beforeEach(() => {
@@ -28,6 +33,7 @@ describe('ChatContextService', () => {
     service = new ChatContextService(
       prisma as unknown as PrismaService,
       documentos as unknown as DocumentosService,
+      casoAcesso as unknown as import('../casos-acesso/caso-acesso.service').CasoAcessoService,
     );
   });
 

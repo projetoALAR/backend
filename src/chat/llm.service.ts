@@ -328,10 +328,7 @@ export class LlmService {
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         this.logger.error(`LLM HTTP ${response.status}: ${errText}`);
-        return {
-          content: ERRO_LLM,
-          tokensUsados: this.estimarTokens(textoEntrada),
-        };
+        throw new ServiceUnavailableException(ERRO_LLM);
       }
 
       const data = (await response.json()) as {
@@ -341,20 +338,15 @@ export class LlmService {
       const content = data.choices?.[0]?.message?.content?.trim();
       if (!content) {
         this.logger.warn('LLM retornou conteúdo vazio');
-        return {
-          content: ERRO_LLM,
-          tokensUsados: this.estimarTokens(textoEntrada),
-        };
+        throw new ServiceUnavailableException(ERRO_LLM);
       }
       const tokensUsados =
         data.usage?.total_tokens ?? this.estimarTokens(textoEntrada + content);
       return { content, tokensUsados };
     } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
       this.logger.error('Falha ao chamar LLM', error as Error);
-      return {
-        content: ERRO_LLM,
-        tokensUsados: this.estimarTokens(textoEntrada),
-      };
+      throw new ServiceUnavailableException(ERRO_LLM);
     }
   }
 }

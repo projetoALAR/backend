@@ -31,17 +31,19 @@ describe('chat-fonte', () => {
     expect(res[0]?.nome).toBe('peticao.pdf');
   });
 
-  it('não anexa fontes só porque têm trecho, se o modelo não citou o nome', () => {
+  it('reconhece citação pelo nome sem extensão', () => {
     const fontes = [
       {
         documentoId: '1',
-        nome: 'contrato.pdf',
-        trecho: 'Cláusula 1',
+        nome: 'Peticao inicial - reclamacao trabalhista.pdf',
+        trecho: 'Pedimos',
         tipo: 'pdf' as const,
       },
     ];
-    expect(
-      filtrarFontesCitadas('Resumo genérico sem citar arquivo.', fontes),
-    ).toEqual([]);
+    const res = filtrarFontesCitadas(
+      'Segundo a Peticao inicial - reclamacao trabalhista, o risco é...',
+      fontes,
+    );
+    expect(res).toHaveLength(1);
   });
 });

@@ -1,6 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { DocumentosService } from '../documentos/documentos.service';
+import {
+  CasoAcessoService,
+  type CasoAcessoUser,
+} from '../casos-acesso/caso-acesso.service';
 import { type ChatFonte, extrairTrechoRelevante } from './chat-fonte.types';
 
 export type CasoLlmAnexo = {
@@ -44,19 +48,29 @@ export class ChatContextService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly documentos: DocumentosService,
+    private readonly casoAcesso: CasoAcessoService,
   ) {}
 
   /**
    * Snapshot AGREGADO do workspace para o chat geral (/chat).
    * Privacidade: NÃO inclui descrição, cliente, documentos nem conteúdo dos casos.
    * Pode expor apenas totais + título/status dos processos.
+   * Assistente: só vê/conta processos atribuídos a ele.
    */
   async montarContexto(opcoes?: {
     processoId?: string | null;
     pergunta?: string;
+    user?: CasoAcessoUser;
   }): Promise<string> {
-    void opcoes;
+    void opcoes?.processoId;
+    void opcoes?.pergunta;
     const agora = new Date();
+    const visProc = opcoes?.user
+      ? this.casoAcesso.visibilidadeProcesso(opcoes.user)
+      : {};
+    const visCli = opcoes?.user
+      ? this.casoAcesso.visibilidadeCliente(opcoes.user)
+      : {};
 
     const [
       totalClientes,
@@ -70,24 +84,29 @@ export class ChatContextService {
       ativosResumo,
       concluidosResumo,
     ] = await Promise.all([
-      this.prisma.cliente.count(),
-      this.prisma.processo.count(),
-      this.prisma.processo.count({ where: { concluido: true } }),
-      this.prisma.processo.count({ where: { concluido: false } }),
+      this.prisma.cliente.count({ where: visCli }),
+      this.prisma.processo.count({ where: visProc }),
+      this.prisma.processo.count({
+        where: { ...visProc, concluido: true },
+      }),
+      this.prisma.processo.count({
+        where: { ...visProc, concluido: false },
+      }),
       this.prisma.processo.groupBy({
         by: ['status'],
+        where: visProc,
         _count: { status: true },
         orderBy: { _count: { status: 'desc' } },
       }),
       this.prisma.processo.groupBy({
         by: ['prioridade'],
-        where: { concluido: false },
+        where: { ...visProc, concluido: false },
         _count: { prioridade: true },
       }),
       this.prisma.membroEquipe.count(),
       this.prisma.membroEquipe.count({ where: { status: 'active' } }),
       this.prisma.processo.findMany({
-        where: { concluido: false },
+        where: { ...visProc, concluido: false },
         take: 50,
         orderBy: { atualizadoEm: 'desc' },
         select: {
@@ -97,7 +116,7 @@ export class ChatContextService {
         },
       }),
       this.prisma.processo.findMany({
-        where: { concluido: true },
+        where: { ...visProc, concluido: true },
         take: 20,
         orderBy: { atualizadoEm: 'desc' },
         select: {
@@ -314,8 +333,12 @@ export class ChatContextService {
           });
         }
 
-        if (tipo === 'texto' && signedUrl && textFilesUsed < MAX_TEXT_FILES) {
-          const texto = await this.baixarTexto(signedUrl, doc.nome);
+        if (tipo === 'texto' && textFilesUsed < MAX_TEXT_FILES) {
+          const texto = await this.obterTextoDocumento(
+            doc.id,
+            doc.nome,
+            signedUrl,
+          );
           if (texto) {
             textFilesUsed += 1;
             const trecho = extrairTrechoRelevante(texto, pergunta);
@@ -331,8 +354,12 @@ export class ChatContextService {
           }
         }
 
-        if (tipo === 'pdf' && signedUrl && pdfFilesUsed < MAX_PDF_FILES) {
-          const textoPdf = await this.baixarPdfTexto(signedUrl, doc.nome);
+        if (tipo === 'pdf' && pdfFilesUsed < MAX_PDF_FILES) {
+          const textoPdf = await this.obterPdfTextoDocumento(
+            doc.id,
+            doc.nome,
+            signedUrl,
+          );
           if (textoPdf) {
             pdfFilesUsed += 1;
             const trecho = extrairTrechoRelevante(textoPdf, pergunta);
@@ -431,6 +458,45 @@ export class ChatContextService {
     return 'outro';
   }
 
+  private async obterTextoDocumento(
+    documentoId: string,
+    nome: string,
+    signedUrl: string,
+  ): Promise<string | null> {
+    if (signedUrl) {
+      const viaUrl = await this.baixarTexto(signedUrl, nome);
+      if (viaUrl) return viaUrl;
+    }
+    try {
+      const file = await this.documentos.baixarArquivo(documentoId);
+      const trimmed = file.buffer.toString('utf8').replace(/\0/g, '').trim();
+      if (!trimmed) return null;
+      if (trimmed.length <= MAX_TEXT_CHARS_PER_FILE) return trimmed;
+      return `${trimmed.slice(0, MAX_TEXT_CHARS_PER_FILE)}\n\n[... truncado ...]`;
+    } catch (error) {
+      this.logger.warn(`Erro ao ler texto via storage ${nome}`, error as Error);
+      return null;
+    }
+  }
+
+  private async obterPdfTextoDocumento(
+    documentoId: string,
+    nome: string,
+    signedUrl: string,
+  ): Promise<string | null> {
+    if (signedUrl) {
+      const viaUrl = await this.baixarPdfTexto(signedUrl, nome);
+      if (viaUrl) return viaUrl;
+    }
+    try {
+      const file = await this.documentos.baixarArquivo(documentoId);
+      return this.extrairTextoPdfBuffer(file.buffer, nome);
+    } catch (error) {
+      this.logger.warn(`Erro ao ler PDF via storage ${nome}`, error as Error);
+      return null;
+    }
+  }
+
   private async baixarTexto(url: string, nome: string): Promise<string | null> {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
@@ -460,6 +526,18 @@ export class ChatContextService {
         return null;
       }
       const buffer = Buffer.from(await res.arrayBuffer());
+      return this.extrairTextoPdfBuffer(buffer, nome);
+    } catch (error) {
+      this.logger.warn(`Erro ao extrair PDF ${nome}`, error as Error);
+      return null;
+    }
+  }
+
+  private async extrairTextoPdfBuffer(
+    buffer: Buffer,
+    nome: string,
+  ): Promise<string | null> {
+    try {
       // pdf-parse v2+: classe PDFParse (não mais função default)
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { PDFParse } = require('pdf-parse') as {
@@ -479,7 +557,7 @@ export class ChatContextService {
         await parser.destroy().catch(() => undefined);
       }
     } catch (error) {
-      this.logger.warn(`Erro ao extrair PDF ${nome}`, error as Error);
+      this.logger.warn(`Erro ao parsear PDF ${nome}`, error as Error);
       return null;
     }
   }

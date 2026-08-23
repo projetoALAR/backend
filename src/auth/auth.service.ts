@@ -662,7 +662,6 @@ export class AuthService implements OnModuleInit {
     if (
       !usuario ||
       usuario.email !== email ||
-      (usuario.role !== Role.ADMIN && usuario.role !== Role.ADVOGADO) ||
       !usuario.totpEnabled ||
       !usuario.totpSecret
     ) {

@@ -74,6 +74,7 @@ export class ChatController {
       id,
       user.id,
       query.formato ?? 'markdown',
+      user,
     );
   }
 

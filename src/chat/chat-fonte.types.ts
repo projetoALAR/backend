@@ -48,10 +48,16 @@ export function filtrarFontesCitadas(
   if (fontes.length === 0) return [];
 
   const respostaLower = resposta.toLowerCase();
-  // Só fontes citadas pelo nome (ex.: [contrato.pdf]) — sem fallback genérico.
-  const mencionadas = fontes.filter((f) =>
-    respostaLower.includes(f.nome.toLowerCase()),
-  );
+  const mencionadas = fontes.filter((f) => {
+    const nome = f.nome.toLowerCase();
+    const base = nome.replace(/\.[a-z0-9]+$/i, '');
+    return (
+      respostaLower.includes(nome) ||
+      (base.length > 3 && respostaLower.includes(base)) ||
+      respostaLower.includes(`[${nome}]`) ||
+      respostaLower.includes(`[${base}]`)
+    );
+  });
 
   const map = new Map<string, ChatFonte>();
   for (const f of mencionadas) {

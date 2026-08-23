@@ -33,6 +33,10 @@ describe('ChatService.enviarMensagem', () => {
     assertPodeUsar: jest.fn(),
   };
 
+  const casoAcesso = {
+    assertPodeVer: jest.fn(),
+  };
+
   let service: ChatService;
 
   beforeEach(() => {
@@ -42,6 +46,7 @@ describe('ChatService.enviarMensagem', () => {
       llm as unknown as LlmService,
       chatContext as unknown as ChatContextService,
       chatQuota as unknown as import('./chat-quota.service').ChatQuotaService,
+      casoAcesso as unknown as import('../casos-acesso/caso-acesso.service').CasoAcessoService,
     );
 
     prisma.conversacao.findUnique.mockResolvedValue({

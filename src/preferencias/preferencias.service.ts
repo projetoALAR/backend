@@ -32,8 +32,13 @@ export class PreferenciasService {
     private documentos: DocumentosService,
     config: ConfigService,
   ) {
-    const url = (config.get<string>('SUPABASE_URL') || '').trim();
-    const key = (config.get<string>('SUPABASE_KEY') || '').trim();
+    const url = (config.get<string>('SUPABASE_URL') || '')
+      .trim()
+      .replace(/^["']|["']$/g, '')
+      .replace(/\/+$/, '');
+    const key = (config.get<string>('SUPABASE_KEY') || '')
+      .trim()
+      .replace(/^["']|["']$/g, '');
     this.supabase = url && key ? createClient(url, key) : null;
   }
 

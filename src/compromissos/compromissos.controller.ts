@@ -55,7 +55,10 @@ export class CompromissosController {
 
   @Roles(Role.ADMIN, Role.ADVOGADO)
   @Delete(':id')
-  async remover(@Param('id', ParseUUIDPipe) id: string) {
-    return this.compromissosService.remover(id);
+  async remover(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: CasoAcessoUser,
+  ) {
+    return this.compromissosService.remover(id, user);
   }
 }

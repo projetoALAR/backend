@@ -8,6 +8,8 @@ import {
   UploadedFile,
   Body,
   ParseUUIDPipe,
+  StreamableFile,
+  Header,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -74,6 +76,23 @@ export class DocumentosController {
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
+  @Get(':id/download')
+  @Header('Cache-Control', 'private, no-store')
+  async download(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: CasoAcessoUser,
+  ) {
+    const meta = await this.documentosService.buscarPorId(id);
+    await this.casoAcesso.assertPodeVer(user, meta.processoId);
+    const file = await this.documentosService.baixarArquivo(id);
+    const asciiName = file.nome.replace(/[^\x20-\x7E]+/g, '_');
+    return new StreamableFile(file.buffer, {
+      type: file.contentType,
+      disposition: `inline; filename="${asciiName}"`,
+    });
+  }
+
+  @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get(':id')
   @ApiOkResponse({ type: DocumentoRespostaDto })
   async buscarPorId(
@@ -90,8 +109,10 @@ export class DocumentosController {
   @ApiOkResponse({ type: DocumentoRespostaDto })
   async remover(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() ator: AuditActor,
+    @CurrentUser() ator: AuditActor & CasoAcessoUser,
   ) {
+    const meta = await this.documentosService.buscarPorId(id);
+    await this.casoAcesso.assertPodeVer(ator, meta.processoId);
     const doc = await this.documentosService.remover(id);
     await this.auditoria.registrar({
       acao: 'EXCLUIR',

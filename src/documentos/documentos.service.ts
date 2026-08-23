@@ -46,8 +46,13 @@ function renderizarPdfDeTexto(texto: string): Promise<Buffer> {
 }
 
 function criarClienteStorage(config: ConfigService): SupabaseClient | null {
-  const url = (config.get<string>('SUPABASE_URL') || '').trim();
-  const key = (config.get<string>('SUPABASE_KEY') || '').trim();
+  const url = (config.get<string>('SUPABASE_URL') || '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/\/+$/, '');
+  const key = (config.get<string>('SUPABASE_KEY') || '')
+    .trim()
+    .replace(/^["']|["']$/g, '');
   if (!url || !key) return null;
   return createClient(url, key);
 }
@@ -107,10 +112,55 @@ export class DocumentosService {
       .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
 
     if (error || !data?.signedUrl) {
-      this.logger.warn(`Falha ao assinar URL de ${path}: ${error?.message}`);
+      const cause =
+        error && typeof error === 'object' && 'cause' in error
+          ? String((error as { cause?: unknown }).cause)
+          : '';
+      this.logger.warn(
+        `Falha ao assinar URL de ${path}: ${error?.message || 'sem signedUrl'}${
+          cause ? ` (${cause})` : ''
+        }`,
+      );
       return urlOrPath.includes('://') ? urlOrPath : '';
     }
     return data.signedUrl;
+  }
+
+  /** Baixa o binário do Storage (proxy autenticado — evita abrir URL vazia no browser). */
+  async baixarArquivo(id: string): Promise<{
+    buffer: Buffer;
+    nome: string;
+    contentType: string;
+  }> {
+    const documento = await this.prisma.documento.findUnique({ where: { id } });
+    if (!documento) {
+      throw new NotFoundException('Documento não encontrado.');
+    }
+    const path = this.extractStoragePath(documento.urlArquivo);
+    const { data, error } = await this.exigirStorage()
+      .storage.from(BUCKET)
+      .download(path);
+    if (error || !data) {
+      this.logger.warn(
+        `Falha ao baixar ${path}: ${error?.message || 'sem data'}`,
+      );
+      throw new InternalServerErrorException(
+        'Não foi possível baixar o arquivo do storage.',
+      );
+    }
+    const buffer = Buffer.from(await data.arrayBuffer());
+    const ext = documento.nome.split('.').pop()?.toLowerCase() || '';
+    const contentType =
+      ext === 'pdf'
+        ? 'application/pdf'
+        : ext === 'png'
+          ? 'image/png'
+          : ext === 'jpg' || ext === 'jpeg'
+            ? 'image/jpeg'
+            : ext === 'webp'
+              ? 'image/webp'
+              : 'application/octet-stream';
+    return { buffer, nome: documento.nome, contentType };
   }
 
   private async withSignedUrl<T extends { urlArquivo: string }>(doc: T) {
