@@ -70,8 +70,15 @@ Rate limit: login (10/min) e register (5/min). Helmet e CORS configuráveis est�
 
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
 - `SMTP_SECURE=true` para TLS implícito
+- **Local:** `npm run smtp:ethereal`
+- **Produção:** Resend (`smtp.resend.com`, user `resend`, pass = API key) — detalhes no `DEPLOY.md` §7 na pasta do monorepo / docs de deploy
 
 Sem SMTP, avisos ainda vão para a caixa de mensagens (`/inbox` / página Mensagens).
+
+### Paywall (piloto)
+
+- `REQUIRE_SUBSCRIPTION=false` (padrão recomendado no piloto) — espelhar `NEXT_PUBLIC_REQUIRE_SUBSCRIPTION` no front
+- Quando for cobrar: `true` + `ASAAS_*` configurados
 
 ## Project setup
 

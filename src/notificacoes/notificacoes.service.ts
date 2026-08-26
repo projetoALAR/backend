@@ -171,18 +171,36 @@ export class NotificacoesService {
     smtpHost: string | null;
     appUrl: string;
     environment: string;
+    /** Piloto: false = escritório usa sem trial/Asaas obrigatório. */
+    requireSubscription: boolean;
     dicaLocal: string;
   } {
     const configured = Boolean(this.transporter);
     const host = this.config.get<string>('SMTP_HOST')?.trim() || null;
+    const requireSub = ['true', '1'].includes(
+      (this.config.get<string>('REQUIRE_SUBSCRIPTION') || '')
+        .trim()
+        .toLowerCase(),
+    );
+    const isProd = (process.env.NODE_ENV || '') === 'production';
+    let dicaLocal: string;
+    if (configured) {
+      dicaLocal =
+        'Use “Enviar e-mail de teste” abaixo. Com Ethereal, a resposta traz um link de preview.';
+    } else if (isProd) {
+      dicaLocal =
+        'Produção: configure Resend (smtp.resend.com) no Railway — ver DEPLOY.md § SMTP. Sem SMTP, convites e reset só caem no inbox do Alar.';
+    } else {
+      dicaLocal =
+        'Local: `npm run smtp:ethereal`, cole SMTP_* no `.env` e reinicie. Produção: prefira Resend (DEPLOY.md).';
+    }
     return {
       smtpConfigured: configured,
       smtpHost: configured ? host : null,
       appUrl: this.appUrl(),
       environment: process.env.NODE_ENV || 'development',
-      dicaLocal: configured
-        ? 'Use “Enviar e-mail de teste” abaixo. Com Ethereal, a resposta traz um link de preview.'
-        : 'Grátis: no backend rode `npm run smtp:ethereal`, cole as variáveis no `.env` e reinicie a API.',
+      requireSubscription: requireSub,
+      dicaLocal,
     };
   }
 

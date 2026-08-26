@@ -88,8 +88,17 @@ describe('NotificacoesService', () => {
           smtpConfigured: false,
           smtpHost: null,
           appUrl: 'http://localhost:3000',
+          requireSubscription: false,
         }),
       );
+    });
+
+    it('statusEmail reflete REQUIRE_SUBSCRIPTION=true', () => {
+      const svc = new NotificacoesService(
+        prisma as unknown as PrismaService,
+        criarConfig({ REQUIRE_SUBSCRIPTION: 'true' }),
+      );
+      expect(svc.statusEmail().requireSubscription).toBe(true);
     });
 
     it('enviarEmailTeste sem SMTP devolve queuedInboxOnly', async () => {
