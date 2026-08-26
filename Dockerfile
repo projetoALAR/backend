@@ -7,7 +7,7 @@ FROM node:22-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# prisma.config.ts exige DIRECT_URL no generate (não usa o banco de verdade)
+# prisma.config no generate: placeholders (não conecta no build)
 ENV DIRECT_URL="postgresql://alar:alar@db:5432/alar"
 ENV DATABASE_URL="postgresql://alar:alar@db:5432/alar"
 RUN npx prisma generate && npm run build
@@ -22,4 +22,5 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 EXPOSE 3001
+# DIRECT_URL (ou DATABASE_URL) deve existir no painel Railway — ver DEPLOY.md
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]

@@ -21,6 +21,9 @@ import {
   Enable2faDto,
   Disable2faDto,
   Verify2faDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  AdminSenhaTemporariaDto,
 } from './auth.dto';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
@@ -131,6 +134,20 @@ export class AuthController {
     return result;
   }
 
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('forgot-password')
+  forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.authService.forgotPassword(body.email);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('reset-password')
+  resetPassword(@Body() body: ResetPasswordDto) {
+    return this.authService.resetPassword(body.token, body.novaSenha);
+  }
+
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)
   @Get('me')
   @ApiOkResponse({ type: UsuarioAuthDto })
@@ -163,6 +180,44 @@ export class AuthController {
   @ApiOkResponse({ type: UsuarioAuthDto, isArray: true })
   listUsers() {
     return this.authService.listUsers();
+  }
+
+  @Roles(Role.ADMIN)
+  @Post('usuarios/:id/enviar-reset')
+  async adminEnviarLinkReset(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() ator: AuditActor & { id: string },
+  ) {
+    const result = await this.authService.adminEnviarLinkReset(id);
+    await this.auditoria.registrar({
+      acao: 'EDITAR',
+      entidade: 'USUARIO',
+      entidadeId: id,
+      resumo: `Admin enviou link de redefinição de senha para ${id}`,
+      ator,
+    });
+    return result;
+  }
+
+  @Roles(Role.ADMIN)
+  @Post('usuarios/:id/senha-temporaria')
+  async adminDefinirSenhaTemporaria(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: AdminSenhaTemporariaDto,
+    @CurrentUser() ator: AuditActor & { id: string },
+  ) {
+    const result = await this.authService.adminDefinirSenhaTemporaria(
+      id,
+      body.senha,
+    );
+    await this.auditoria.registrar({
+      acao: 'EDITAR',
+      entidade: 'USUARIO',
+      entidadeId: id,
+      resumo: `Admin definiu senha temporária e troca obrigatória para ${id}`,
+      ator,
+    });
+    return result;
   }
 
   @Roles(Role.ADMIN)

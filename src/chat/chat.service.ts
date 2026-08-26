@@ -9,6 +9,10 @@ import { ChatContextService } from './chat-context.service';
 import { filtrarFontesCitadas, type ChatFonte } from './chat-fonte.types';
 import { ChatQuotaService } from './chat-quota.service';
 import type { Role } from '../auth/roles';
+import {
+  CasoAcessoService,
+  type CasoAcessoUser,
+} from '../casos-acesso/caso-acesso.service';
 import { exportarConversaJson, exportarConversaMarkdown } from './chat-export';
 
 @Injectable()
@@ -18,6 +22,7 @@ export class ChatService {
     private llm: LlmService,
     private chatContext: ChatContextService,
     private chatQuota: ChatQuotaService,
+    private casoAcesso: CasoAcessoService,
   ) {}
 
   private async assertDonoGeral(id: string, usuarioId: string) {
@@ -38,12 +43,16 @@ export class ChatService {
     return conversa;
   }
 
-  private async assertAcessoMensagem(id: string, usuarioId: string) {
+  private async assertAcessoMensagem(
+    id: string,
+    usuarioId: string,
+    user?: CasoAcessoUser,
+  ) {
     const conversa = await this.prisma.conversacao.findUnique({
       where: { id },
       include: {
         mensagens: {
-          orderBy: { criadoEm: 'asc' },
+          orderBy: { criadoEm: 'desc' },
           take: 20,
         },
       },
@@ -54,7 +63,14 @@ export class ChatService {
     if (conversa.usuarioId !== usuarioId) {
       throw new ForbiddenException('Você não tem acesso a esta conversa.');
     }
-    return conversa;
+    if (conversa.processoId && user) {
+      await this.casoAcesso.assertPodeVer(user, conversa.processoId);
+    }
+    // Prisma devolve as 20 mais recentes em ordem desc — inverter para o LLM.
+    return {
+      ...conversa,
+      mensagens: [...conversa.mensagens].reverse(),
+    };
   }
 
   /** Apenas conversas do chat geral do usuário logado. */
@@ -130,7 +146,14 @@ export class ChatService {
     usuarioId: string,
     role?: Role,
   ) {
-    const conversa = await this.assertAcessoMensagem(conversacaoId, usuarioId);
+    const acessoUser: CasoAcessoUser | undefined = role
+      ? { id: usuarioId, role }
+      : undefined;
+    const conversa = await this.assertAcessoMensagem(
+      conversacaoId,
+      usuarioId,
+      acessoUser,
+    );
 
     await this.chatQuota.assertPodeUsar(usuarioId, role);
 
@@ -174,6 +197,7 @@ export class ChatService {
       } else {
         const contextoProjeto = await this.chatContext.montarContexto({
           pergunta: conteudo,
+          user: acessoUser,
         });
         const llmRes = await this.llm.gerarRespostaJuridica(
           conteudo,
@@ -231,8 +255,18 @@ export class ChatService {
     return this.chatQuota.resumo(usuarioId, role);
   }
 
-  registrarFeedback(mensagemId: string, usuarioId: string, util: boolean) {
-    return this.chatQuota.registrarFeedback(mensagemId, usuarioId, util);
+  registrarFeedback(
+    mensagemId: string,
+    usuarioId: string,
+    util: boolean,
+    motivo?: string,
+  ) {
+    return this.chatQuota.registrarFeedback(
+      mensagemId,
+      usuarioId,
+      util,
+      motivo,
+    );
   }
 
   metricasAdmin() {
@@ -243,6 +277,7 @@ export class ChatService {
     id: string,
     usuarioId: string,
     formato: 'markdown' | 'json' = 'markdown',
+    user?: CasoAcessoUser,
   ) {
     const conversa = await this.prisma.conversacao.findUnique({
       where: { id },
@@ -256,6 +291,9 @@ export class ChatService {
     }
     if (conversa.usuarioId !== usuarioId) {
       throw new ForbiddenException('Você não tem acesso a esta conversa.');
+    }
+    if (conversa.processoId && user) {
+      await this.casoAcesso.assertPodeVer(user, conversa.processoId);
     }
 
     const exportFn =

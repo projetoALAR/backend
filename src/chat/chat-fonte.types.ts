@@ -48,17 +48,20 @@ export function filtrarFontesCitadas(
   if (fontes.length === 0) return [];
 
   const respostaLower = resposta.toLowerCase();
-  const mencionadas = fontes.filter((f) =>
-    respostaLower.includes(f.nome.toLowerCase()),
-  );
-  const comTrecho = fontes.filter((f) => f.trecho);
+  const mencionadas = fontes.filter((f) => {
+    const nome = f.nome.toLowerCase();
+    const base = nome.replace(/\.[a-z0-9]+$/i, '');
+    return (
+      respostaLower.includes(nome) ||
+      (base.length > 3 && respostaLower.includes(base)) ||
+      respostaLower.includes(`[${nome}]`) ||
+      respostaLower.includes(`[${base}]`)
+    );
+  });
 
   const map = new Map<string, ChatFonte>();
-  for (const f of [...mencionadas, ...comTrecho]) {
+  for (const f of mencionadas) {
     map.set(f.documentoId, f);
   }
-
-  const picked = [...map.values()];
-  if (picked.length > 0) return picked.slice(0, 6);
-  return comTrecho.slice(0, 3);
+  return [...map.values()].slice(0, 6);
 }

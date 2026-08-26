@@ -57,6 +57,7 @@ describe('DocumentosService', () => {
     return new DocumentosService(
       prisma as unknown as PrismaService,
       { get: (key: string) => config[key] } as ConfigService,
+      { assertPodeArmazenarBytes: jest.fn() } as never,
     );
   }
 

@@ -5,6 +5,7 @@ import { ProcessosService } from './processos.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ProcessosTimelineService } from './processos-timeline.service';
 import { ProcessosCapaService } from './processos-capa.service';
+import { ProcessosRelatorioPdfService } from './processos-relatorio-pdf.service';
 import { Role } from '../auth/roles';
 
 describe('ProcessosController', () => {
@@ -16,6 +17,10 @@ describe('ProcessosController', () => {
     buscarPorId: jest.fn(),
     atualizar: jest.fn(),
     remover: jest.fn(),
+    modeloCsvImportacao: jest.fn().mockReturnValue('numero,status\n'),
+    modeloXlsxImportacao: jest.fn().mockResolvedValue(Buffer.from('xlsx')),
+    importarCsv: jest.fn(),
+    importarArquivo: jest.fn(),
   };
   const auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
   const timeline = {
@@ -23,6 +28,7 @@ describe('ProcessosController', () => {
     comentar: jest.fn(),
   };
   const capa = { gerar: jest.fn() };
+  const relatorioPdf = { gerar: jest.fn() };
   const ator = { id: 'u1', role: Role.ADVOGADO };
 
   beforeEach(async () => {
@@ -34,10 +40,45 @@ describe('ProcessosController', () => {
         { provide: AuditoriaService, useValue: auditoria },
         { provide: ProcessosTimelineService, useValue: timeline },
         { provide: ProcessosCapaService, useValue: capa },
+        { provide: ProcessosRelatorioPdfService, useValue: relatorioPdf },
       ],
     }).compile();
 
     controller = module.get(ProcessosController);
+  });
+
+  it('importa arquivo e registra auditoria', async () => {
+    const resultado = {
+      total: 1,
+      criados: 1,
+      duplicados: 0,
+      erros: 0,
+      resultados: [],
+    };
+    processosService.importarArquivo.mockResolvedValue(resultado);
+    const arquivo = {
+      buffer: Buffer.from('numero,status,clienteCpf\n1,Em andamento,123\n'),
+      originalname: 'casos.csv',
+      mimetype: 'text/csv',
+    } as Express.Multer.File;
+
+    await expect(controller.importar(arquivo, ator)).resolves.toEqual(
+      resultado,
+    );
+    expect(processosService.importarArquivo).toHaveBeenCalledWith(
+      arquivo.buffer,
+      'casos.csv',
+      'text/csv',
+      'u1',
+      undefined,
+    );
+    expect(auditoria.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        acao: 'CRIAR',
+        entidade: 'PROCESSO',
+        resumo: expect.stringContaining('Importação'),
+      }),
+    );
   });
 
   it('cria caso e registra auditoria', async () => {
@@ -73,6 +114,20 @@ describe('ProcessosController', () => {
     const arquivo = await controller.baixarCapa('p1', ator);
     expect(arquivo).toBeInstanceOf(StreamableFile);
     expect(capa.gerar).toHaveBeenCalledWith('p1', ator);
+  });
+
+  it('devolve PDF do relatório', async () => {
+    relatorioPdf.gerar.mockResolvedValue({
+      buffer: Buffer.from('%PDF-1.4'),
+      filename: 'relatorio-casos.pdf',
+    });
+    const body = {
+      filtrosResumo: 'status=Em andamento',
+      linhas: [{ numero: '1', status: 'Em andamento' }],
+    };
+    const arquivo = await controller.baixarRelatorioPdf(body);
+    expect(arquivo).toBeInstanceOf(StreamableFile);
+    expect(relatorioPdf.gerar).toHaveBeenCalledWith(body);
   });
 
   it('delega timeline e comentário', async () => {

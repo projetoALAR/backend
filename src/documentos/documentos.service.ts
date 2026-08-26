@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../prisma.service';
+import { BillingService } from '../billing/billing.service';
 import { DOCUMENTO_MIME_ALLOWLIST } from './documentos.dto';
 import 'multer';
 
@@ -46,8 +47,13 @@ function renderizarPdfDeTexto(texto: string): Promise<Buffer> {
 }
 
 function criarClienteStorage(config: ConfigService): SupabaseClient | null {
-  const url = (config.get<string>('SUPABASE_URL') || '').trim();
-  const key = (config.get<string>('SUPABASE_KEY') || '').trim();
+  const url = (config.get<string>('SUPABASE_URL') || '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/\/+$/, '');
+  const key = (config.get<string>('SUPABASE_KEY') || '')
+    .trim()
+    .replace(/^["']|["']$/g, '');
   if (!url || !key) return null;
   return createClient(url, key);
 }
@@ -60,6 +66,7 @@ export class DocumentosService {
   constructor(
     private prisma: PrismaService,
     config: ConfigService,
+    private billing: BillingService,
   ) {
     this.supabase = criarClienteStorage(config);
     if (!this.supabase) {
@@ -107,10 +114,55 @@ export class DocumentosService {
       .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
 
     if (error || !data?.signedUrl) {
-      this.logger.warn(`Falha ao assinar URL de ${path}: ${error?.message}`);
+      const cause =
+        error && typeof error === 'object' && 'cause' in error
+          ? String((error as { cause?: unknown }).cause)
+          : '';
+      this.logger.warn(
+        `Falha ao assinar URL de ${path}: ${error?.message || 'sem signedUrl'}${
+          cause ? ` (${cause})` : ''
+        }`,
+      );
       return urlOrPath.includes('://') ? urlOrPath : '';
     }
     return data.signedUrl;
+  }
+
+  /** Baixa o binário do Storage (proxy autenticado — evita abrir URL vazia no browser). */
+  async baixarArquivo(id: string): Promise<{
+    buffer: Buffer;
+    nome: string;
+    contentType: string;
+  }> {
+    const documento = await this.prisma.documento.findUnique({ where: { id } });
+    if (!documento) {
+      throw new NotFoundException('Documento não encontrado.');
+    }
+    const path = this.extractStoragePath(documento.urlArquivo);
+    const { data, error } = await this.exigirStorage()
+      .storage.from(BUCKET)
+      .download(path);
+    if (error || !data) {
+      this.logger.warn(
+        `Falha ao baixar ${path}: ${error?.message || 'sem data'}`,
+      );
+      throw new InternalServerErrorException(
+        'Não foi possível baixar o arquivo do storage.',
+      );
+    }
+    const buffer = Buffer.from(await data.arrayBuffer());
+    const ext = documento.nome.split('.').pop()?.toLowerCase() || '';
+    const contentType =
+      ext === 'pdf'
+        ? 'application/pdf'
+        : ext === 'png'
+          ? 'image/png'
+          : ext === 'jpg' || ext === 'jpeg'
+            ? 'image/jpeg'
+            : ext === 'webp'
+              ? 'image/webp'
+              : 'application/octet-stream';
+    return { buffer, nome: documento.nome, contentType };
   }
 
   private async withSignedUrl<T extends { urlArquivo: string }>(doc: T) {
@@ -150,6 +202,8 @@ export class DocumentosService {
         `Tipo de arquivo não permitido (${mime || ext || 'desconhecido'}). Use PDF, imagens, TXT/CSV ou Word.`,
       );
     }
+
+    await this.billing.assertPodeArmazenarBytes(arquivo.size);
 
     const processo = await this.prisma.processo.findUnique({
       where: { id: processoId },
@@ -222,6 +276,7 @@ export class DocumentosService {
     const safeName = nomeComExt.replace(/[^\w.-]+/g, '_');
     const storagePath = `${processoId}/${Date.now()}-${safeName}`;
     const pdfBuffer = await renderizarPdfDeTexto(conteudoTexto);
+    await this.billing.assertPodeArmazenarBytes(pdfBuffer.length);
 
     const { error: uploadError } = await this.exigirStorage()
       .storage.from(BUCKET)
@@ -258,6 +313,17 @@ export class DocumentosService {
       include: { revisadoPorUsuario: { select: { nome: true } } },
     });
     return Promise.all(docs.map((d) => this.withSignedUrl(d)));
+  }
+
+  async buscarPorId(id: string) {
+    const documento = await this.prisma.documento.findUnique({
+      where: { id },
+      include: { revisadoPorUsuario: { select: { nome: true } } },
+    });
+    if (!documento) {
+      throw new NotFoundException('Documento não encontrado.');
+    }
+    return this.withSignedUrl(documento);
   }
 
   async remover(id: string) {

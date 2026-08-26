@@ -99,6 +99,8 @@ export class LlmService {
           'Quando houver imagens anexadas na mensagem do usuário, analise o conteúdo visual e relate o que aparece de forma objetiva.',
           'OBRIGATÓRIO: se fizer resumo do caso ou listar anexos, mencione TODOS os arquivos do inventário pelo nome — nunca omita um anexo.',
           'Ao usar trecho de documento, cite o arquivo pelo nome entre colchetes, ex.: [contrato.pdf].',
+          'Se a resposta NÃO se basear em nenhum anexo, diga explicitamente que não encontrou base nos anexos do caso.',
+          'Não apresente afirmações factuais sobre o processo sem citar o arquivo correspondente ou admitir a ausência de fonte.',
           'Responda com base nos fatos deste caso. Não invente documentos, datas ou partes.',
           antiAlucinacao,
           'Se a pergunta for sobre a imagem/anexo, descreva o que vê e relacione com o caso.',
@@ -209,6 +211,7 @@ export class LlmService {
             'Use apenas fatos e dados fornecidos no prompt do usuário.',
             'NÃO invente jurisprudência, súmulas, acórdãos, ementas, números de processo, valores, datas ou partes.',
             'Se faltar informação, use o marcador [A COMPLETAR] em vez de inventar.',
+            'Quando houver lacunas, prefira vários [A COMPLETAR] claros a inventar conteúdo.',
             'Não afirme como verdade o que não estiver no contexto.',
             'Responda em português do Brasil, em prosa formal adequada à peça.',
             'O texto deve ser tratado como rascunho — nunca como documento final.',
@@ -325,10 +328,7 @@ export class LlmService {
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         this.logger.error(`LLM HTTP ${response.status}: ${errText}`);
-        return {
-          content: ERRO_LLM,
-          tokensUsados: this.estimarTokens(textoEntrada),
-        };
+        throw new ServiceUnavailableException(ERRO_LLM);
       }
 
       const data = (await response.json()) as {
@@ -338,20 +338,15 @@ export class LlmService {
       const content = data.choices?.[0]?.message?.content?.trim();
       if (!content) {
         this.logger.warn('LLM retornou conteúdo vazio');
-        return {
-          content: ERRO_LLM,
-          tokensUsados: this.estimarTokens(textoEntrada),
-        };
+        throw new ServiceUnavailableException(ERRO_LLM);
       }
       const tokensUsados =
         data.usage?.total_tokens ?? this.estimarTokens(textoEntrada + content);
       return { content, tokensUsados };
     } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
       this.logger.error('Falha ao chamar LLM', error as Error);
-      return {
-        content: ERRO_LLM,
-        tokensUsados: this.estimarTokens(textoEntrada),
-      };
+      throw new ServiceUnavailableException(ERRO_LLM);
     }
   }
 }

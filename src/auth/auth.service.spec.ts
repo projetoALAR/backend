@@ -14,11 +14,18 @@ import { EquipeService } from '../equipe/equipe.service';
 import { Role } from './roles';
 import { LoginLockoutService } from './login-lockout.service';
 import { TotpService } from './totp.service';
+import { NotificacoesService } from '../notificacoes/notificacoes.service';
 
 jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
   hash: jest.fn(),
 }));
+
+const notificacoesMock = {
+  enviarEmailTransacional: jest.fn().mockResolvedValue(undefined),
+  appPublicUrl: jest.fn().mockReturnValue('http://localhost:3000'),
+  criarInbox: jest.fn().mockResolvedValue(undefined),
+} as unknown as NotificacoesService;
 
 describe('AuthService.changePassword', () => {
   let service: AuthService;
@@ -41,6 +48,9 @@ describe('AuthService.changePassword', () => {
       equipe as unknown as EquipeService,
       new LoginLockoutService(),
       new TotpService(),
+      notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
   });
 
@@ -83,7 +93,12 @@ describe('AuthService.changePassword', () => {
 
     expect(prisma.usuario.update).toHaveBeenCalledWith({
       where: { id: 'u1' },
-      data: { senhaHash: 'hash-novo' },
+      data: {
+        senhaHash: 'hash-novo',
+        mustChangePassword: false,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
     });
   });
 
@@ -130,6 +145,9 @@ describe('AuthService.createUserByAdmin', () => {
       equipe as unknown as EquipeService,
       new LoginLockoutService(),
       new TotpService(),
+      notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
 
     const result = await service.createUserByAdmin({
@@ -174,6 +192,9 @@ describe('AuthService.login lockout', () => {
       { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
       lockout,
       new TotpService(),
+      notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
@@ -215,6 +236,9 @@ describe('AuthService.login 2FA', () => {
       { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
       new LoginLockoutService(),
       new TotpService(),
+      notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
@@ -255,6 +279,9 @@ describe('AuthService.login 2FA', () => {
       { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
       new LoginLockoutService(),
       new TotpService(),
+      notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
@@ -279,6 +306,9 @@ describe('AuthService.login 2FA', () => {
       { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
       new LoginLockoutService(),
       new TotpService(),
+      notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
 
     await expect(
@@ -317,6 +347,9 @@ describe('AuthService.login 2FA', () => {
       { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
       new LoginLockoutService(),
       { verifyCode: jest.fn().mockReturnValue(true) } as unknown as TotpService,
+      notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
 
     await expect(
@@ -340,6 +373,9 @@ describe('AuthService 2FA setup', () => {
     { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
     new LoginLockoutService(),
     new TotpService(),
+    notificacoesMock,
+
+    { assertPodeAdicionarUsuario: jest.fn() } as never,
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -379,6 +415,9 @@ describe('AuthService.adminDisableTwoFactor', () => {
     { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
     new LoginLockoutService(),
     new TotpService(),
+    notificacoesMock,
+
+    { assertPodeAdicionarUsuario: jest.fn() } as never,
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -423,5 +462,155 @@ describe('AuthService.adminDisableTwoFactor', () => {
     await expect(service.adminDisableTwoFactor('u3')).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+});
+
+describe('AuthService admin senha', () => {
+  const prisma = {
+    usuario: { findUnique: jest.fn(), update: jest.fn() },
+  };
+  const service = new AuthService(
+    prisma as unknown as PrismaService,
+    {} as JwtService,
+    {} as ConfigService,
+    { resolveSignedUrl: jest.fn() } as unknown as DocumentosService,
+    { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
+    new LoginLockoutService(),
+    new TotpService(),
+    notificacoesMock,
+
+    { assertPodeAdicionarUsuario: jest.fn() } as never,
+  );
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('adminEnviarLinkReset marca troca e envia e-mail', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u2',
+      nome: 'Ana',
+      email: 'ana@alar.com.br',
+    });
+    prisma.usuario.update.mockResolvedValue({});
+    ;(
+      notificacoesMock.enviarEmailTransacional as jest.Mock
+    ).mockResolvedValue({ queuedInboxOnly: true, devPreviewLink: 'http://x' });
+
+    const result = await service.adminEnviarLinkReset('u2');
+    expect(result.ok).toBe(true);
+    expect(result.devResetLink).toBe('http://x');
+    expect(prisma.usuario.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'u2' },
+        data: expect.objectContaining({ mustChangePassword: true }),
+      }),
+    );
+  });
+
+  it('adminDefinirSenhaTemporaria atualiza hash e convite', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u2',
+      nome: 'Ana',
+      email: 'ana@alar.com.br',
+    });
+    prisma.usuario.update.mockResolvedValue({});
+    ;(bcrypt.hash as jest.Mock).mockResolvedValue('hash-novo');
+
+    await expect(
+      service.adminDefinirSenhaTemporaria('u2', 'AlarTrocar123'),
+    ).resolves.toEqual({ ok: true });
+
+    expect(prisma.usuario.update).toHaveBeenCalledWith({
+      where: { id: 'u2' },
+      data: expect.objectContaining({
+        senhaHash: 'hash-novo',
+        mustChangePassword: true,
+      }),
+    });
+    expect(notificacoesMock.enviarEmailTransacional).toHaveBeenCalled();
+  });
+});
+
+describe('AuthService forgot/reset password', () => {
+  const prisma = {
+    usuario: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
+  };
+  const service = new AuthService(
+    prisma as unknown as PrismaService,
+    {} as JwtService,
+    {} as ConfigService,
+    { resolveSignedUrl: jest.fn() } as unknown as DocumentosService,
+    { ensureMembroForUsuario: jest.fn() } as unknown as EquipeService,
+    new LoginLockoutService(),
+    new TotpService(),
+    notificacoesMock,
+
+    { assertPodeAdicionarUsuario: jest.fn() } as never,
+  );
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('forgotPassword não revela e-mail inexistente', async () => {
+    prisma.usuario.findUnique.mockResolvedValue(null);
+    await expect(service.forgotPassword('x@alar.com.br')).resolves.toEqual({
+      ok: true,
+    });
+    expect(notificacoesMock.enviarEmailTransacional).not.toHaveBeenCalled();
+  });
+
+  it('forgotPassword grava token e envia e-mail', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'u1',
+      nome: 'Ana',
+      email: 'ana@alar.com.br',
+    });
+    prisma.usuario.update.mockResolvedValue({});
+    ;(
+      notificacoesMock.enviarEmailTransacional as jest.Mock
+    ).mockResolvedValue({ queuedInboxOnly: true });
+
+    await expect(service.forgotPassword('ana@alar.com.br')).resolves.toEqual({
+      ok: true,
+    });
+    expect(prisma.usuario.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'u1' },
+        data: expect.objectContaining({
+          passwordResetToken: expect.any(String),
+          passwordResetExpires: expect.any(Date),
+        }),
+      }),
+    );
+    expect(notificacoesMock.enviarEmailTransacional).toHaveBeenCalled();
+  });
+
+  it('resetPassword rejeita token inválido', async () => {
+    prisma.usuario.findFirst.mockResolvedValue(null);
+    await expect(
+      service.resetPassword('token-inexistente-com-20c', 'AlarNovaSenha1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('resetPassword atualiza hash e limpa flag', async () => {
+    prisma.usuario.findFirst.mockResolvedValue({ id: 'u1' });
+    prisma.usuario.update.mockResolvedValue({});
+    ;(bcrypt.hash as jest.Mock).mockResolvedValue('hash-reset');
+
+    await expect(
+      service.resetPassword('token-valido-com-20chars!', 'AlarNovaSenha1'),
+    ).resolves.toEqual({ ok: true });
+
+    expect(prisma.usuario.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: {
+        senhaHash: 'hash-reset',
+        mustChangePassword: false,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
   });
 });

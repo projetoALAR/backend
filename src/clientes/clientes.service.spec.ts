@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ClientesService } from './clientes.service';
 import { PrismaService } from '../prisma.service';
 import { DocumentosService } from '../documentos/documentos.service';
@@ -34,13 +35,13 @@ describe('ClientesService', () => {
   it('cria pessoa física exigindo CPF', async () => {
     prisma.cliente.create.mockResolvedValue({ id: 'c1', tipo: 'PF' });
     await expect(
-      service.criar({ nome: 'Ana', cpf: '123.456.789-01' }),
+      service.criar({ nome: 'Ana', cpf: '390.533.447-05' }),
     ).resolves.toEqual({ id: 'c1', tipo: 'PF' });
     expect(prisma.cliente.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           tipo: 'PF',
-          cpf: '12345678901',
+          cpf: '39053344705',
           cnpj: null,
         }),
       }),
@@ -53,7 +54,7 @@ describe('ClientesService', () => {
       service.criar({
         nome: 'Escritório X',
         tipo: 'PJ',
-        cnpj: '12.345.678/0001-99',
+        cnpj: '11.222.333/0001-81',
       }),
     ).resolves.toEqual({ id: 'c2', tipo: 'PJ' });
     expect(prisma.cliente.create).toHaveBeenCalledWith(
@@ -61,7 +62,7 @@ describe('ClientesService', () => {
         data: expect.objectContaining({
           tipo: 'PJ',
           cpf: null,
-          cnpj: '12345678000199',
+          cnpj: '11222333000181',
         }),
       }),
     );
@@ -71,6 +72,22 @@ describe('ClientesService', () => {
     await expect(service.criar({ nome: 'Ana', cpf: '123' })).rejects.toThrow(
       'CPF deve ter 11 dígitos',
     );
+  });
+
+  it('rejeita CPF com dígito verificador inválido', async () => {
+    await expect(
+      service.criar({ nome: 'Ana', cpf: '123.456.789-01' }),
+    ).rejects.toThrow('CPF inválido');
+  });
+
+  it('rejeita CNPJ com dígito verificador inválido', async () => {
+    await expect(
+      service.criar({
+        nome: 'Empresa',
+        tipo: 'PJ',
+        cnpj: '12.345.678/0001-99',
+      }),
+    ).rejects.toThrow('CNPJ inválido');
   });
 
   it('buscarPorId devolve o cliente visível', async () => {
@@ -163,5 +180,47 @@ describe('ClientesService', () => {
         }),
       }),
     );
+  });
+
+  it('importarCsv cria PF e PJ do modelo', async () => {
+    prisma.cliente.create
+      .mockResolvedValueOnce({ id: 'c1', nome: 'Marina Souza Lima' })
+      .mockResolvedValueOnce({ id: 'c2', nome: 'Horizonte Atacado Ltda' });
+
+    const resultado = await service.importarCsv(service.modeloCsv());
+    expect(resultado.criados).toBe(2);
+    expect(resultado.erros).toBe(0);
+    expect(resultado.duplicados).toBe(0);
+    expect(prisma.cliente.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('importarCsv marca duplicado no banco sem parar o lote', async () => {
+    prisma.cliente.create
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('unique', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      )
+      .mockResolvedValueOnce({ id: 'c2', nome: 'Beta Ltda' });
+
+    const csv = [
+      'nome,tipo,cpf,cnpj',
+      'Ana,PF,39053344705,',
+      'Beta Ltda,PJ,,11222333000181',
+    ].join('\n');
+    const resultado = await service.importarCsv(csv);
+    expect(resultado.duplicados).toBe(1);
+    expect(resultado.criados).toBe(1);
+    expect(resultado.erros).toBe(0);
+  });
+
+  it('importarArquivo rejeita mapeamento sem nome', async () => {
+    const csv = 'ColA,ColB\nAna,x\n';
+    await expect(
+      service.importarArquivo(Buffer.from(csv, 'utf8'), 'c.csv', 'text/csv', {
+        '0': 'email',
+      }),
+    ).rejects.toThrow(/Nome/);
   });
 });

@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
+  NotFoundException,
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -17,6 +18,9 @@ import { EquipeService } from '../equipe/equipe.service';
 import { LoginLockoutService } from './login-lockout.service';
 import { assertSenhaForte } from './password-policy';
 import { TotpService } from './totp.service';
+import { NotificacoesService } from '../notificacoes/notificacoes.service';
+import { randomBytes, createHash } from 'crypto';
+import { BillingService } from '../billing/billing.service';
 
 export type AuthUser = {
   id: string;
@@ -26,6 +30,7 @@ export type AuthUser = {
   fotoUrl: string | null;
   criadoEm: Date;
   totpEnabled: boolean;
+  mustChangePassword: boolean;
 };
 
 @Injectable()
@@ -40,6 +45,8 @@ export class AuthService implements OnModuleInit {
     private readonly equipe: EquipeService,
     private readonly lockout: LoginLockoutService,
     private readonly totp: TotpService,
+    private readonly notificacoes: NotificacoesService,
+    private readonly billing: BillingService,
   ) {}
 
   async onModuleInit() {
@@ -97,6 +104,7 @@ export class AuthService implements OnModuleInit {
     fotoUrl: string | null;
     criadoEm: Date;
     totpEnabled?: boolean;
+    mustChangePassword?: boolean;
   }): Promise<AuthUser> {
     const fotoUrl = usuario.fotoUrl
       ? await this.documentos.resolveSignedUrl(usuario.fotoUrl)
@@ -109,6 +117,7 @@ export class AuthService implements OnModuleInit {
       fotoUrl,
       criadoEm: usuario.criadoEm,
       totpEnabled: !!usuario.totpEnabled,
+      mustChangePassword: !!usuario.mustChangePassword,
     };
   }
 
@@ -168,13 +177,16 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException('Papel inválido');
     }
 
+    await this.billing.assertPodeAdicionarUsuario();
+
     const user = await this.createUser({
       nome: dados.nome,
       email: dados.email,
       senha: dados.senha,
       role,
+      mustChangePassword: true,
     });
-
+    await this.enviarConviteAcesso(user, dados.senha);
     return { user };
   }
 
@@ -183,6 +195,7 @@ export class AuthService implements OnModuleInit {
     email: string;
     senha: string;
     role: Role;
+    mustChangePassword?: boolean;
   }): Promise<AuthUser> {
     const email = dados.email.trim().toLowerCase();
     assertSenhaForte(dados.senha);
@@ -201,6 +214,7 @@ export class AuthService implements OnModuleInit {
         email,
         senhaHash,
         role: dados.role,
+        mustChangePassword: dados.mustChangePassword ?? false,
       },
     });
 
@@ -220,6 +234,43 @@ export class AuthService implements OnModuleInit {
       role: authUser.role,
     });
     return authUser;
+  }
+
+  async enviarConviteAcesso(
+    user: { id: string; nome: string; email: string },
+    senhaTemporaria?: string,
+  ) {
+    const base = this.notificacoes.appPublicUrl().replace(/\/$/, '');
+    const corpo = [
+      `Olá, ${user.nome}.`,
+      '',
+      'Sua conta no Alar foi criada.',
+      senhaTemporaria
+        ? `Senha temporária: ${senhaTemporaria}`
+        : 'Use o link de login para acessar.',
+      '',
+      'No primeiro acesso você deverá trocar a senha.',
+      '',
+      `E-mail de login: ${user.email}`,
+    ].join('\n');
+
+    await this.notificacoes.enviarEmailTransacional({
+      para: user.email,
+      assunto: 'Bem-vindo ao Alar — acesso criado',
+      titulo: 'Conta criada',
+      corpo,
+      link: `${base}/login`,
+      linkRotulo: 'Entrar no Alar',
+    });
+
+    await this.notificacoes.criarInbox({
+      usuarioId: user.id,
+      titulo: 'Bem-vindo ao Alar',
+      corpo:
+        'Sua conta foi criada. Troque a senha temporária no primeiro acesso.',
+      tipo: 'sistema',
+      link: '/trocar-senha',
+    });
   }
 
   async login(dados: { email: string; senha: string }) {
@@ -267,7 +318,11 @@ export class AuthService implements OnModuleInit {
     return this.toAuthUser(usuario);
   }
 
-  async changePassword(userId: string, senhaAtual: string, novaSenha: string) {
+  async changePassword(
+    userId: string,
+    senhaAtual: string | undefined,
+    novaSenha: string,
+  ) {
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: userId },
     });
@@ -275,20 +330,177 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Usuário não encontrado');
     }
 
-    const ok = await bcrypt.compare(senhaAtual, usuario.senhaHash);
-    if (!ok) {
-      throw new BadRequestException('Senha atual incorreta');
-    }
-
-    if (senhaAtual === novaSenha) {
-      throw new BadRequestException('A nova senha deve ser diferente da atual');
+    if (usuario.mustChangePassword) {
+      // Troca obrigatória: senha atual opcional, mas se enviada deve bater
+      if (senhaAtual) {
+        const ok = await bcrypt.compare(senhaAtual, usuario.senhaHash);
+        if (!ok) {
+          throw new BadRequestException('Senha atual incorreta');
+        }
+        if (senhaAtual === novaSenha) {
+          throw new BadRequestException(
+            'A nova senha deve ser diferente da atual',
+          );
+        }
+      }
+    } else {
+      if (!senhaAtual) {
+        throw new BadRequestException('Senha atual obrigatória');
+      }
+      const ok = await bcrypt.compare(senhaAtual, usuario.senhaHash);
+      if (!ok) {
+        throw new BadRequestException('Senha atual incorreta');
+      }
+      if (senhaAtual === novaSenha) {
+        throw new BadRequestException(
+          'A nova senha deve ser diferente da atual',
+        );
+      }
     }
 
     assertSenhaForte(novaSenha);
 
     await this.prisma.usuario.update({
       where: { id: userId },
-      data: { senhaHash: await bcrypt.hash(novaSenha, 10) },
+      data: {
+        senhaHash: await bcrypt.hash(novaSenha, 10),
+        mustChangePassword: false,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+
+    return { ok: true };
+  }
+
+  /** Sempre responde ok (não revela se o e-mail existe). */
+  async forgotPassword(emailRaw: string) {
+    const email = emailRaw.trim().toLowerCase();
+    const usuario = await this.prisma.usuario.findUnique({ where: { email } });
+    if (!usuario) {
+      return { ok: true as const };
+    }
+    return this.emitirLinkResetSenha(usuario, {
+      assunto: 'Redefinir senha',
+      titulo: 'Redefinir senha',
+      corpo: [
+        `Olá, ${usuario.nome}.`,
+        '',
+        'Recebemos um pedido para redefinir sua senha no Alar.',
+        'O link expira em 1 hora. Se você não pediu isso, ignore este e-mail.',
+      ].join('\n'),
+    });
+  }
+
+  /** Admin: envia link de redefinição para um usuário conhecido. */
+  async adminEnviarLinkReset(userId: string) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+    });
+    if (!usuario) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: { mustChangePassword: true },
+    });
+    return this.emitirLinkResetSenha(usuario, {
+      assunto: 'Redefinir senha (pedido do administrador)',
+      titulo: 'Redefinir senha',
+      corpo: [
+        `Olá, ${usuario.nome}.`,
+        '',
+        'Um administrador do Alar pediu que você defina uma nova senha.',
+        'O link expira em 1 hora.',
+      ].join('\n'),
+    });
+  }
+
+  /** Admin: define senha temporária e marca troca obrigatória. */
+  async adminDefinirSenhaTemporaria(userId: string, senha: string) {
+    assertSenhaForte(senha);
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+    });
+    if (!usuario) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        senhaHash: await bcrypt.hash(senha, 10),
+        mustChangePassword: true,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+
+    await this.enviarConviteAcesso(
+      { id: usuario.id, nome: usuario.nome, email: usuario.email },
+      senha,
+    );
+
+    return { ok: true as const };
+  }
+
+  private async emitirLinkResetSenha(
+    usuario: { id: string; nome: string; email: string },
+    email: { assunto: string; titulo: string; corpo: string },
+  ) {
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1h
+
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        passwordResetToken: tokenHash,
+        passwordResetExpires: expires,
+      },
+    });
+
+    const base = this.notificacoes.appPublicUrl().replace(/\/$/, '');
+    const link = `${base}/redefinir-senha?token=${token}`;
+
+    const emailResult = await this.notificacoes.enviarEmailTransacional({
+      para: usuario.email,
+      assunto: email.assunto,
+      titulo: email.titulo,
+      corpo: email.corpo,
+      link,
+      linkRotulo: 'Escolher nova senha',
+    });
+
+    return {
+      ok: true as const,
+      ...(emailResult.devPreviewLink
+        ? { devResetLink: emailResult.devPreviewLink }
+        : {}),
+    };
+  }
+
+  async resetPassword(token: string, novaSenha: string) {
+    assertSenhaForte(novaSenha);
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const usuario = await this.prisma.usuario.findFirst({
+      where: {
+        passwordResetToken: tokenHash,
+        passwordResetExpires: { gt: new Date() },
+      },
+    });
+    if (!usuario) {
+      throw new BadRequestException('Link inválido ou expirado');
+    }
+
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        senhaHash: await bcrypt.hash(novaSenha, 10),
+        mustChangePassword: false,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
     });
 
     return { ok: true };
@@ -304,11 +516,19 @@ export class AuthService implements OnModuleInit {
         role: true,
         fotoUrl: true,
         criadoEm: true,
+        mustChangePassword: true,
+        totpEnabled: true,
       },
     });
     return Promise.all(
       usuarios.map(async (u) => ({
-        ...u,
+        id: u.id,
+        nome: u.nome,
+        email: u.email,
+        role: u.role,
+        criadoEm: u.criadoEm,
+        mustChangePassword: !!u.mustChangePassword,
+        totpEnabled: !!u.totpEnabled,
         fotoUrl: u.fotoUrl
           ? await this.documentos.resolveSignedUrl(u.fotoUrl)
           : null,
@@ -446,7 +666,6 @@ export class AuthService implements OnModuleInit {
     if (
       !usuario ||
       usuario.email !== email ||
-      (usuario.role !== Role.ADMIN && usuario.role !== Role.ADVOGADO) ||
       !usuario.totpEnabled ||
       !usuario.totpSecret
     ) {

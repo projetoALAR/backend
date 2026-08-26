@@ -8,10 +8,10 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "npx prisma migrate deploy && node dist/main",
+    "start": "node scripts/run-with-system-ca.js nest start",
+    "start:dev": "node scripts/run-with-system-ca.js nest start --watch",
+    "start:debug": "node scripts/run-with-system-ca.js nest start --debug --watch",
+    "start:prod": "npx prisma migrate deploy && node scripts/run-with-system-ca.js node dist/main",
     "seed:casos-reais": "ts-node --transpile-only prisma/seed.casos-reais.ts",
     "seed:enriquecer-casos": "ts-node --transpile-only prisma/seed.enriquecer-casos.ts",
     "seed:demo": "ts-node --transpile-only prisma/seed.demo-dois-casos.ts",
@@ -21,7 +21,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "openapi:export": "ts-node --transpile-only scripts/export-openapi.ts"
+    "openapi:export": "ts-node --transpile-only scripts/export-openapi.ts",
+    "smtp:ethereal": "node scripts/gerar-smtp-ethereal.js",
+    "backup:smoke": "node scripts/backup-smoke.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",
@@ -42,6 +44,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "helmet": "^8.3.0",
     "nodemailer": "^9.0.4",
     "otpauth": "^9.5.1",

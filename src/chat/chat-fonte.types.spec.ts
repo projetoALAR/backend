@@ -27,6 +27,23 @@ describe('chat-fonte', () => {
       'Conforme peticao.pdf, o pedido é...',
       fontes,
     );
-    expect(res.some((f) => f.nome === 'peticao.pdf')).toBe(true);
+    expect(res).toHaveLength(1);
+    expect(res[0]?.nome).toBe('peticao.pdf');
+  });
+
+  it('reconhece citação pelo nome sem extensão', () => {
+    const fontes = [
+      {
+        documentoId: '1',
+        nome: 'Peticao inicial - reclamacao trabalhista.pdf',
+        trecho: 'Pedimos',
+        tipo: 'pdf' as const,
+      },
+    ];
+    const res = filtrarFontesCitadas(
+      'Segundo a Peticao inicial - reclamacao trabalhista, o risco é...',
+      fontes,
+    );
+    expect(res).toHaveLength(1);
   });
 });

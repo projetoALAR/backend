@@ -37,10 +37,14 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
+.env.railway
 .env.development.local
 .env.test.local
 .env.production.local
 .env.local
+
+# Local DB dumps (npm run backup:smoke)
+/backups/
 
 # temp directory
 .temp

@@ -10,6 +10,9 @@ describe('EquipeController', () => {
     listarTodos: jest.fn(),
     atualizar: jest.fn(),
     remover: jest.fn(),
+    modeloXlsx: jest.fn().mockResolvedValue(Buffer.from('xlsx')),
+    previewArquivo: jest.fn(),
+    importarArquivo: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -25,6 +28,33 @@ describe('EquipeController', () => {
       ],
     }).compile();
     controller = module.get(EquipeController);
+  });
+
+  it('importar arquiva CSV com senhaPadrao', async () => {
+    const resultado = {
+      total: 1,
+      criados: 1,
+      duplicados: 0,
+      erros: 0,
+      resultados: [],
+    };
+    equipeService.importarArquivo.mockResolvedValue(resultado);
+    const arquivo = {
+      buffer: Buffer.from('nome;email\nAna;ana@x.com\n'),
+      originalname: 'equipe.csv',
+      mimetype: 'text/csv',
+    } as Express.Multer.File;
+
+    await expect(
+      controller.importar(arquivo, { id: 'admin' }, undefined, 'AlarTrocar123'),
+    ).resolves.toEqual(resultado);
+    expect(equipeService.importarArquivo).toHaveBeenCalledWith(
+      arquivo.buffer,
+      'equipe.csv',
+      'text/csv',
+      undefined,
+      'AlarTrocar123',
+    );
   });
 
   it('criar delega ao service', async () => {

@@ -87,8 +87,49 @@ export class NotificacoesService {
     const to = usuario?.email;
     if (!to) return { skipped: true };
 
+    return this.enviarEmailTransacional({
+      para: to,
+      assunto,
+      titulo: assunto,
+      corpo: texto,
+      link,
+    });
+  }
+
+  /**
+   * E-mail transacional (convite, reset de senha) — ignora preferência de opt-out.
+   */
+  async enviarEmailTransacional(opcoes: {
+    para: string;
+    assunto: string;
+    titulo: string;
+    corpo: string;
+    link?: string;
+    linkRotulo?: string;
+  }): Promise<{
+    sent?: boolean;
+    queuedInboxOnly?: boolean;
+    skipped?: boolean;
+    /** Só em desenvolvimento e sem SMTP — para testar fluxos localmente. */
+    devPreviewLink?: string;
+    /** Quando o transporte é Ethereal — URL para abrir a mensagem no browser. */
+    etherealPreviewUrl?: string;
+  }> {
     if (!this.transporter) {
-      return { queuedInboxOnly: true };
+      this.logger.warn(
+        `SMTP ausente — e-mail transacional não enviado para ${opcoes.para}`,
+      );
+      if (opcoes.link) {
+        this.logger.warn(
+          `[dev] Link do e-mail "${opcoes.assunto}": ${opcoes.link}`,
+        );
+      }
+      const allowDevLink =
+        process.env.NODE_ENV !== 'production' && Boolean(opcoes.link);
+      return {
+        queuedInboxOnly: true,
+        ...(allowDevLink ? { devPreviewLink: opcoes.link } : {}),
+      };
     }
 
     const from =
@@ -97,25 +138,76 @@ export class NotificacoesService {
       'noreply@alar.local';
 
     const { html, text } = montarEmailAlar({
-      titulo: assunto,
-      corpo: texto,
-      link,
+      titulo: opcoes.titulo,
+      corpo: opcoes.corpo,
+      link: opcoes.link,
+      linkRotulo: opcoes.linkRotulo,
       appUrl: this.appUrl(),
     });
 
     try {
-      await this.transporter.sendMail({
+      const info = await this.transporter.sendMail({
         from,
-        to,
-        subject: `[Alar] ${assunto}`,
+        to: opcoes.para,
+        subject: `[Alar] ${opcoes.assunto}`,
         text,
         html,
       });
-      return { sent: true };
+      const etherealPreviewUrl =
+        nodemailer.getTestMessageUrl(info) || undefined;
+      return {
+        sent: true,
+        ...(etherealPreviewUrl ? { etherealPreviewUrl } : {}),
+      };
     } catch (error) {
-      this.logger.error('Falha ao enviar e-mail', error as Error);
+      this.logger.error('Falha ao enviar e-mail transacional', error as Error);
       return { sent: false };
     }
+  }
+
+  /** Status seguro para admin (sem secrets). */
+  statusEmail(): {
+    smtpConfigured: boolean;
+    smtpHost: string | null;
+    appUrl: string;
+    environment: string;
+    dicaLocal: string;
+  } {
+    const configured = Boolean(this.transporter);
+    const host = this.config.get<string>('SMTP_HOST')?.trim() || null;
+    return {
+      smtpConfigured: configured,
+      smtpHost: configured ? host : null,
+      appUrl: this.appUrl(),
+      environment: process.env.NODE_ENV || 'development',
+      dicaLocal: configured
+        ? 'Use “Enviar e-mail de teste” abaixo. Com Ethereal, a resposta traz um link de preview.'
+        : 'Grátis: no backend rode `npm run smtp:ethereal`, cole as variáveis no `.env` e reinicie a API.',
+    };
+  }
+
+  /** Disparo de verificação — só admin (controller). */
+  async enviarEmailTeste(para: string): Promise<{
+    sent?: boolean;
+    queuedInboxOnly?: boolean;
+    skipped?: boolean;
+    etherealPreviewUrl?: string;
+    para: string;
+  }> {
+    const resultado = await this.enviarEmailTransacional({
+      para,
+      assunto: 'E-mail de teste',
+      titulo: 'Alar — teste de SMTP',
+      corpo:
+        'Se você está lendo isto, o envio transacional do Alar está funcionando. Convites, reset de senha e lembretes de prazo usam o mesmo caminho.',
+      link: this.appUrl(),
+      linkRotulo: 'Abrir o Alar',
+    });
+    return { ...resultado, para };
+  }
+
+  appPublicUrl(): string {
+    return this.appUrl();
   }
 
   async notificarTodosUsuarios(

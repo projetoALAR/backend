@@ -30,7 +30,7 @@ describe('LlmService', () => {
     expect(resposta.content.startsWith('[Modo demonstração]')).toBe(true);
   });
 
-  it('falha HTTP retorna erro explícito (não mock silencioso)', async () => {
+  it('falha HTTP lança ServiceUnavailable (não mock silencioso)', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 500,
@@ -38,11 +38,9 @@ describe('LlmService', () => {
     });
 
     const service = buildService({ OPENAI_API_KEY: 'sk-test' });
-    const resposta = await service.gerarRespostaJuridica('olá', [], {
-      modo: 'workspace',
-    });
-    expect(resposta.content).toMatch(/Não consegui obter resposta da IA/);
-    expect(resposta.content).not.toMatch(/\[Modo demonstração\]/);
+    await expect(
+      service.gerarRespostaJuridica('olá', [], { modo: 'workspace' }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
   describe('gerarTextoDocumento', () => {

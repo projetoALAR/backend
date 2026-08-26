@@ -6,11 +6,100 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
-import { CreateProcessoDto, UpdateProcessoDto } from './processos.dto';
+import {
+  CreateProcessoDto,
+  PROCESSO_STATUS,
+  UpdateProcessoDto,
+} from './processos.dto';
 import {
   CasoAcessoService,
   type CasoAcessoUser,
 } from '../casos-acesso/caso-acesso.service';
+import {
+  CAMPOS_ALVO_PROCESSOS,
+  linhasDeCsvProcessos,
+  linhasDeTabelaProcessos,
+  MODELO_CSV_PROCESSOS,
+  normalizarStatusProcesso,
+  parsearTagsCsv,
+  sugerirColunaProcesso,
+  type LinhaImportacaoProcesso,
+} from './processos-importacao.util';
+import {
+  ehArquivoCsv,
+  ehArquivoPlanilha,
+  lerPlanilhaComoTabela,
+  montarModeloProcessosXlsx,
+} from '../importacao/planilha-importacao.util';
+import {
+  aplicarMapeamento,
+  lerTabelaDeArquivo,
+  montarPreview,
+  type MapeamentoColunas,
+  type PreviewImportacao,
+  validarMapeamento,
+} from '../importacao/importacao-mapeamento.util';
+import { validarDigitoCnj } from '../andamentos/datajud-tribunal.util';
+import {
+  normalizarPaginacao,
+  type PaginaResultado,
+} from '../common/paginacao.dto';
+
+export const MAX_LINHAS_IMPORTACAO_PROCESSOS = 500;
+
+export type ResultadoLinhaImportacaoProcesso = {
+  linha: number;
+  status: 'criado' | 'duplicado' | 'erro';
+  numero?: string;
+  titulo?: string;
+  processoId?: string;
+  clienteNome?: string;
+  motivo?: string;
+};
+
+export type ResultadoImportacaoProcessos = {
+  total: number;
+  criados: number;
+  duplicados: number;
+  erros: number;
+  resultados: ResultadoLinhaImportacaoProcesso[];
+};
+
+function soDigitos(valor?: string | null): string | null {
+  if (valor == null) return null;
+  const d = valor.replace(/\D/g, '');
+  return d || null;
+}
+
+function mensagemErroImportacao(err: unknown): string {
+  if (err instanceof BadRequestException) {
+    const res = err.getResponse();
+    if (typeof res === 'string') return res;
+    if (res && typeof res === 'object' && 'message' in res) {
+      const msg = (res as { message?: string | string[] }).message;
+      if (Array.isArray(msg)) return msg.join('; ');
+      if (typeof msg === 'string') return msg;
+    }
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return 'Falha ao importar';
+}
+
+/** Aceita AAAA-MM-DD ou DD/MM/AAAA. */
+function parsearPrazoCsv(raw: string): string | null {
+  const t = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+    const d = new Date(`${t}T12:00:00`);
+    return Number.isNaN(d.getTime()) ? null : t;
+  }
+  const br = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t);
+  if (br) {
+    const iso = `${br[3]}-${br[2].padStart(2, '0')}-${br[1].padStart(2, '0')}`;
+    const d = new Date(`${iso}T12:00:00`);
+    return Number.isNaN(d.getTime()) ? null : iso;
+  }
+  return null;
+}
 
 const usuarioResumo = {
   select: { id: true, nome: true, email: true, role: true },
@@ -45,7 +134,18 @@ export class ProcessosService {
     private casoAcesso: CasoAcessoService,
   ) {}
 
-  async criar(dados: CreateProcessoDto, atorId?: string) {
+  async criar(
+    dados: CreateProcessoDto,
+    atorId?: string,
+    opcoes?: { silencioso?: boolean },
+  ) {
+    const numero = dados.numero.trim();
+    if (!validarDigitoCnj(numero)) {
+      throw new BadRequestException(
+        'Número CNJ inválido (confira os 20 dígitos e o dígito verificador)',
+      );
+    }
+
     const { responsavelId, coResponsavelId } = await this.resolverEquipe(
       dados.responsavelId !== undefined
         ? dados.responsavelId
@@ -55,7 +155,7 @@ export class ProcessosService {
 
     const processo = await this.prisma.processo.create({
       data: {
-        numero: dados.numero.trim(),
+        numero,
         status: dados.status,
         clienteId: dados.clienteId,
         titulo: dados.titulo,
@@ -70,7 +170,7 @@ export class ProcessosService {
       include: processoInclude,
     });
 
-    if (processo.prazo) {
+    if (processo.prazo && !opcoes?.silencioso) {
       const quando = new Date(processo.prazo).toLocaleDateString('pt-BR');
       await this.notificacoes.notificarTodosUsuarios(
         'Novo caso com prazo',
@@ -81,6 +181,288 @@ export class ProcessosService {
     }
 
     return processo;
+  }
+
+  modeloCsvImportacao(): string {
+    return MODELO_CSV_PROCESSOS;
+  }
+
+  async modeloXlsxImportacao(): Promise<Buffer> {
+    return montarModeloProcessosXlsx(PROCESSO_STATUS);
+  }
+
+  async previewArquivo(
+    buffer: Buffer,
+    nomeArquivo: string,
+    mime?: string,
+  ): Promise<PreviewImportacao> {
+    try {
+      const tabela = await lerTabelaDeArquivo(buffer, nomeArquivo, mime);
+      return montarPreview(
+        tabela,
+        [...CAMPOS_ALVO_PROCESSOS],
+        (h) => sugerirColunaProcesso(h),
+      );
+    } catch (err) {
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'Arquivo inválido',
+      );
+    }
+  }
+
+  /**
+   * Importa casos via CSV ou Excel. Com mapeamento, aceita planilha de qualquer sistema.
+   */
+  async importarArquivo(
+    buffer: Buffer,
+    nomeArquivo: string,
+    mime?: string,
+    atorId?: string,
+    mapeamento?: MapeamentoColunas | null,
+  ): Promise<ResultadoImportacaoProcessos> {
+    let linhas: LinhaImportacaoProcesso[];
+    try {
+      if (mapeamento && Object.keys(mapeamento).length > 0) {
+        const erroMap = validarMapeamento(mapeamento, [...CAMPOS_ALVO_PROCESSOS], {
+          exigirUmDe: [
+            {
+              chaves: ['clienteCpf', 'clienteCnpj', 'clienteDocumento'],
+              rotulo: 'CPF, CNPJ ou Documento do cliente',
+            },
+          ],
+        });
+        if (erroMap) throw new BadRequestException(erroMap);
+        const tabela = await lerTabelaDeArquivo(buffer, nomeArquivo, mime);
+        linhas = aplicarMapeamento<LinhaImportacaoProcesso>(
+          tabela,
+          mapeamento,
+          {
+            documentoPara: { cpf: 'clienteCpf', cnpj: 'clienteCnpj' },
+          },
+        );
+      } else {
+        const nome = (nomeArquivo || '').toLowerCase();
+        if (
+          nome.endsWith('.xlsx') ||
+          (ehArquivoPlanilha(nomeArquivo, mime) && !nome.endsWith('.csv'))
+        ) {
+          const tabela = await lerPlanilhaComoTabela(buffer);
+          linhas = linhasDeTabelaProcessos(tabela);
+        } else if (ehArquivoCsv(nomeArquivo, mime) || nome.endsWith('.csv')) {
+          linhas = linhasDeCsvProcessos(buffer.toString('utf8'));
+        } else {
+          throw new BadRequestException(
+            'Envie um arquivo .xlsx (Excel) ou .csv.',
+          );
+        }
+      }
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'Arquivo inválido',
+      );
+    }
+    return this.importarLinhas(linhas, atorId);
+  }
+
+  async importarCsv(
+    texto: string,
+    atorId?: string,
+  ): Promise<ResultadoImportacaoProcessos> {
+    let linhas: LinhaImportacaoProcesso[];
+    try {
+      linhas = linhasDeCsvProcessos(texto);
+    } catch (err) {
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'CSV inválido',
+      );
+    }
+    return this.importarLinhas(linhas, atorId);
+  }
+
+  private async importarLinhas(
+    linhas: LinhaImportacaoProcesso[],
+    atorId?: string,
+  ): Promise<ResultadoImportacaoProcessos> {
+    if (linhas.length === 0) {
+      throw new BadRequestException(
+        'Arquivo sem linhas de dados. Preencha a aba Dados do modelo.',
+      );
+    }
+    if (linhas.length > MAX_LINHAS_IMPORTACAO_PROCESSOS) {
+      throw new BadRequestException(
+        `Limite de ${MAX_LINHAS_IMPORTACAO_PROCESSOS} casos por importação.`,
+      );
+    }
+
+    const resultados: ResultadoLinhaImportacaoProcesso[] = [];
+    let criados = 0;
+    let duplicados = 0;
+    let erros = 0;
+    const numerosNoArquivo = new Set<string>();
+
+    for (const linha of linhas) {
+      const numero = linha.numero?.trim();
+      if (!numero) {
+        erros += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'erro',
+          motivo: 'Número do processo obrigatório',
+        });
+        continue;
+      }
+
+      if (!validarDigitoCnj(numero)) {
+        erros += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'erro',
+          numero,
+          motivo:
+            'Número CNJ inválido (confira os 20 dígitos e o dígito verificador)',
+        });
+        continue;
+      }
+
+      const chaveNumero = numero.replace(/\s+/g, '').toLowerCase();
+      if (numerosNoArquivo.has(chaveNumero)) {
+        duplicados += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'duplicado',
+          numero,
+          motivo: 'Número repetido neste arquivo',
+        });
+        continue;
+      }
+      numerosNoArquivo.add(chaveNumero);
+
+      const status = normalizarStatusProcesso(linha.status);
+      if (!status) {
+        erros += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'erro',
+          numero,
+          motivo: `Status inválido. Use: ${PROCESSO_STATUS.join(', ')}`,
+        });
+        continue;
+      }
+
+      const cpf = soDigitos(linha.clienteCpf);
+      const cnpj = soDigitos(linha.clienteCnpj);
+      if (!cpf && !cnpj) {
+        erros += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'erro',
+          numero,
+          motivo: 'Informe clienteCpf ou clienteCnpj do cliente já importado',
+        });
+        continue;
+      }
+
+      const cliente = await this.prisma.cliente.findFirst({
+        where: {
+          OR: [
+            ...(cpf ? [{ cpf }] : []),
+            ...(cnpj ? [{ cnpj }] : []),
+          ],
+        },
+        select: { id: true, nome: true },
+      });
+      if (!cliente) {
+        erros += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'erro',
+          numero,
+          motivo: cpf
+            ? `Cliente com CPF ${cpf} não encontrado — importe os clientes antes`
+            : `Cliente com CNPJ ${cnpj} não encontrado — importe os clientes antes`,
+        });
+        continue;
+      }
+
+      let prazoIso: string | undefined;
+      if (linha.prazo?.trim()) {
+        const p = parsearPrazoCsv(linha.prazo);
+        if (!p) {
+          erros += 1;
+          resultados.push({
+            linha: linha.linha,
+            status: 'erro',
+            numero,
+            motivo: 'Prazo inválido (use AAAA-MM-DD ou DD/MM/AAAA)',
+          });
+          continue;
+        }
+        prazoIso = p;
+      }
+
+      const titulo = linha.titulo?.trim() || numero;
+      const prioridade = linha.prioridade?.trim() || 'Média';
+      const tags = parsearTagsCsv(linha.tags);
+      const concluido =
+        status === 'Concluído' || status === 'Arquivado' ? true : false;
+
+      try {
+        const criado = await this.criar(
+          {
+            numero,
+            status,
+            clienteId: cliente.id,
+            titulo,
+            descricao: linha.descricao?.trim() || null,
+            prioridade,
+            prazo: prazoIso,
+            tags,
+            concluido,
+          },
+          atorId,
+          { silencioso: true },
+        );
+        criados += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'criado',
+          numero: criado.numero,
+          titulo: criado.titulo ?? titulo,
+          processoId: criado.id,
+          clienteNome: cliente.nome,
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          duplicados += 1;
+          resultados.push({
+            linha: linha.linha,
+            status: 'duplicado',
+            numero,
+            motivo: 'Já existe caso com este número',
+          });
+          continue;
+        }
+        erros += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'erro',
+          numero,
+          motivo: mensagemErroImportacao(err),
+        });
+      }
+    }
+
+    return {
+      total: linhas.length,
+      criados,
+      duplicados,
+      erros,
+      resultados,
+    };
   }
 
   async listarPorCliente(clienteId: string, user: CasoAcessoUser) {
@@ -94,15 +476,100 @@ export class ProcessosService {
     });
   }
 
-  async listarTodos(user: CasoAcessoUser) {
-    return this.prisma.processo.findMany({
-      where: this.casoAcesso.visibilidadeProcesso(user),
-      include: {
-        ...processoInclude,
-        _count: { select: { documentos: true, compromissos: true } },
-      },
-      orderBy: { criadoEm: 'desc' },
-    });
+  async listarTodos(
+    user: CasoAcessoUser,
+    filtro?: {
+      page?: number;
+      limit?: number;
+      q?: string;
+      situacao?: 'ativos' | 'concluidos';
+      status?: string[];
+      prioridade?: string[];
+      prazoDe?: string;
+      prazoAte?: string;
+    },
+  ) {
+    const q = filtro?.q?.trim();
+    const digitos = q ? q.replace(/\D/g, '') : '';
+    const busca: Prisma.ProcessoWhereInput | undefined = q
+      ? {
+          OR: [
+            { titulo: { contains: q, mode: 'insensitive' } },
+            { numero: { contains: q, mode: 'insensitive' } },
+            { status: { contains: q, mode: 'insensitive' } },
+            { cliente: { nome: { contains: q, mode: 'insensitive' } } },
+            ...(digitos.length >= 3
+              ? [{ numero: { contains: digitos } }]
+              : []),
+          ],
+        }
+      : undefined;
+
+    const situacaoWhere: Prisma.ProcessoWhereInput | undefined =
+      filtro?.situacao === 'ativos'
+        ? { concluido: false }
+        : filtro?.situacao === 'concluidos'
+          ? { concluido: true }
+          : undefined;
+
+    const statusWhere: Prisma.ProcessoWhereInput | undefined =
+      filtro?.status && filtro.status.length > 0
+        ? { status: { in: filtro.status } }
+        : undefined;
+
+    const prioridadeWhere: Prisma.ProcessoWhereInput | undefined =
+      filtro?.prioridade && filtro.prioridade.length > 0
+        ? { prioridade: { in: filtro.prioridade } }
+        : undefined;
+
+    let prazoWhere: Prisma.ProcessoWhereInput | undefined;
+    if (filtro?.prazoDe || filtro?.prazoAte) {
+      const prazo: Prisma.DateTimeFilter = {};
+      if (filtro.prazoDe) {
+        prazo.gte = new Date(`${filtro.prazoDe}T00:00:00.000`);
+      }
+      if (filtro.prazoAte) {
+        prazo.lte = new Date(`${filtro.prazoAte}T23:59:59.999`);
+      }
+      prazoWhere = { prazo };
+    }
+
+    const where: Prisma.ProcessoWhereInput = {
+      AND: [
+        this.casoAcesso.visibilidadeProcesso(user),
+        ...(busca ? [busca] : []),
+        ...(situacaoWhere ? [situacaoWhere] : []),
+        ...(statusWhere ? [statusWhere] : []),
+        ...(prioridadeWhere ? [prioridadeWhere] : []),
+        ...(prazoWhere ? [prazoWhere] : []),
+      ],
+    };
+
+    const include = {
+      ...processoInclude,
+      _count: { select: { documentos: true, compromissos: true } },
+    };
+    const orderBy = { criadoEm: 'desc' as const };
+    const { paginar, page, limit } = normalizarPaginacao(filtro);
+
+    if (!paginar) {
+      return this.prisma.processo.findMany({ where, include, orderBy });
+    }
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.processo.findMany({
+        where,
+        include,
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.processo.count({ where }),
+    ]);
+
+    return { items, total, page, limit } satisfies PaginaResultado<
+      (typeof items)[number]
+    >;
   }
 
   async buscarPorId(id: string, user: CasoAcessoUser) {
@@ -123,6 +590,11 @@ export class ProcessosService {
   async atualizar(id: string, dados: UpdateProcessoDto) {
     const numeroNovo =
       dados.numero !== undefined ? dados.numero.trim() : undefined;
+    if (numeroNovo !== undefined && !validarDigitoCnj(numeroNovo)) {
+      throw new BadRequestException(
+        'Número CNJ inválido (confira os 20 dígitos e o dígito verificador)',
+      );
+    }
 
     const equipe =
       dados.responsavelId !== undefined || dados.coResponsavelId !== undefined

@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
 import { CreateCompromissoDto, UpdateCompromissoDto } from './compromissos.dto';
@@ -69,11 +69,25 @@ export class CompromissosService {
     user: CasoAcessoUser,
   ) {
     const atual = await this.prisma.compromisso.findUnique({ where: { id } });
-    if (atual?.processoId) {
+    if (!atual) {
+      throw new NotFoundException('Compromisso não encontrado');
+    }
+    if (atual.processoId) {
       await this.casoAcesso.assertPodeVer(user, atual.processoId);
+    } else if (this.casoAcesso.precisaFiltrar(user)) {
+      throw new ForbiddenException(
+        'Assistente só pode editar compromissos vinculados a um caso atribuído',
+      );
     }
     if (dados.processoId) {
       await this.casoAcesso.assertPodeVer(user, dados.processoId);
+    } else if (
+      dados.processoId === null &&
+      this.casoAcesso.precisaFiltrar(user)
+    ) {
+      throw new ForbiddenException(
+        'Assistente não pode desvincular o compromisso do caso',
+      );
     }
     return this.prisma.compromisso.update({
       where: { id },
@@ -92,7 +106,18 @@ export class CompromissosService {
     });
   }
 
-  async remover(id: string) {
+  async remover(id: string, user: CasoAcessoUser) {
+    const atual = await this.prisma.compromisso.findUnique({ where: { id } });
+    if (!atual) {
+      throw new NotFoundException('Compromisso não encontrado');
+    }
+    if (atual.processoId) {
+      await this.casoAcesso.assertPodeVer(user, atual.processoId);
+    } else if (this.casoAcesso.precisaFiltrar(user)) {
+      throw new ForbiddenException(
+        'Assistente só pode remover compromissos vinculados a um caso atribuído',
+      );
+    }
     return this.prisma.compromisso.delete({
       where: { id },
     });

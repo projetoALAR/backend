@@ -1,10 +1,14 @@
 import { BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ProcessosService } from './processos.service';
 import { PrismaService } from '../prisma.service';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
 import { CasoAcessoService } from '../casos-acesso/caso-acesso.service';
 import { Role } from '../auth/roles';
 import { CreateProcessoDto, UpdateProcessoDto } from './processos.dto';
+
+const CNJ = '0000001-46.2024.8.26.0100';
+const CNJ_B = '0000002-41.2024.8.26.0100';
 
 describe('ProcessosService', () => {
   const prisma = {
@@ -15,6 +19,7 @@ describe('ProcessosService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    cliente: { findFirst: jest.fn() },
     usuario: { findUnique: jest.fn() },
   };
   const notificacoes = { notificarTodosUsuarios: jest.fn() };
@@ -40,7 +45,7 @@ describe('ProcessosService', () => {
     const criado = {
       id: 'p1',
       titulo: 'Caso',
-      numero: '1',
+      numero: CNJ,
       prazo: new Date('2026-09-01'),
     };
     prisma.processo.create.mockResolvedValue(criado);
@@ -48,7 +53,7 @@ describe('ProcessosService', () => {
     await expect(
       service.criar(
         {
-          numero: ' 1 ',
+          numero: ` ${CNJ} `,
           clienteId: 'c1',
           status: 'Em andamento',
           titulo: 'Caso',
@@ -61,10 +66,33 @@ describe('ProcessosService', () => {
     expect(notificacoes.notificarTodosUsuarios).toHaveBeenCalled();
   });
 
+  it('cria caso com prazo em modo silencioso sem notificar', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ id: 'u1' });
+    prisma.processo.create.mockResolvedValue({
+      id: 'p1',
+      titulo: 'Caso',
+      numero: CNJ,
+      prazo: new Date('2026-09-01'),
+    });
+    await service.criar(
+      {
+        numero: CNJ,
+        clienteId: 'c1',
+        status: 'Em andamento',
+        titulo: 'Caso',
+        prazo: '2026-09-01',
+        responsavelId: 'u1',
+      },
+      'u1',
+      { silencioso: true },
+    );
+    expect(notificacoes.notificarTodosUsuarios).not.toHaveBeenCalled();
+  });
+
   it('rejeita responsável e co-responsável iguais', async () => {
     await expect(
       service.criar({
-        numero: '1',
+        numero: CNJ,
         clienteId: 'c1',
         status: 'Em andamento',
         titulo: 'Caso',
@@ -78,7 +106,7 @@ describe('ProcessosService', () => {
     prisma.usuario.findUnique.mockResolvedValue(null);
     await expect(
       service.criar({
-        numero: '1',
+        numero: CNJ,
         clienteId: 'c1',
         status: 'Em andamento',
         titulo: 'Caso',
@@ -101,6 +129,23 @@ describe('ProcessosService', () => {
     expect(casoAcesso.visibilidadeProcesso).toHaveBeenCalledWith(user);
   });
 
+  it('lista processos paginados com total', async () => {
+    prisma.processo.findMany.mockResolvedValue([{ id: 'p1' }]);
+    prisma.processo.count = jest.fn().mockResolvedValue(1);
+    prisma.$transaction = jest
+      .fn()
+      .mockImplementation(async (ops: Promise<unknown>[]) => Promise.all(ops));
+
+    await expect(
+      service.listarTodos(user, { page: 1, limit: 12, q: 'silva' }),
+    ).resolves.toEqual({
+      items: [{ id: 'p1' }],
+      total: 1,
+      page: 1,
+      limit: 12,
+    });
+  });
+
   it('atualiza numero, prazo e equipe', async () => {
     prisma.processo.findUnique.mockResolvedValue({
       responsavelId: 'u1',
@@ -111,7 +156,7 @@ describe('ProcessosService', () => {
 
     await expect(
       service.atualizar('p1', {
-        numero: ' 99 ',
+        numero: ` ${CNJ_B} `,
         prazo: null,
         coResponsavelId: 'u2',
       } satisfies UpdateProcessoDto),
@@ -120,7 +165,7 @@ describe('ProcessosService', () => {
       data: Record<string, unknown>;
     };
     expect(updateArg.data).toMatchObject({
-      numero: '99',
+      numero: CNJ_B,
       tribunalSigla: null,
       prazo: null,
       coResponsavelId: 'u2',
@@ -130,5 +175,58 @@ describe('ProcessosService', () => {
   it('remove o caso', async () => {
     prisma.processo.delete.mockResolvedValue({ id: 'p1' });
     await expect(service.remover('p1')).resolves.toEqual({ id: 'p1' });
+  });
+
+  it('importarCsv cria casos do modelo vinculados por CPF/CNPJ', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ id: 'u1' });
+    prisma.cliente.findFirst
+      .mockResolvedValueOnce({ id: 'c1', nome: 'Marina' })
+      .mockResolvedValueOnce({ id: 'c2', nome: 'Horizonte' });
+    prisma.processo.create
+      .mockResolvedValueOnce({
+        id: 'p1',
+        numero: '1004521-38.2025.5.02.0001',
+        titulo: 'Reclamação trabalhista — horas extras',
+        prazo: null,
+      })
+      .mockResolvedValueOnce({
+        id: 'p2',
+        numero: '1018834-72.2026.8.26.0100',
+        titulo: 'Cobrança de duplicatas',
+        prazo: null,
+      });
+
+    const resultado = await service.importarCsv(
+      service.modeloCsvImportacao(),
+      'u1',
+    );
+    expect(resultado.criados).toBe(2);
+    expect(resultado.erros).toBe(0);
+    expect(resultado.duplicados).toBe(0);
+    expect(prisma.processo.create).toHaveBeenCalledTimes(2);
+    expect(notificacoes.notificarTodosUsuarios).not.toHaveBeenCalled();
+  });
+
+  it('importarCsv marca duplicado e cliente ausente sem parar o lote', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ id: 'u1' });
+    prisma.cliente.findFirst
+      .mockResolvedValueOnce({ id: 'c1', nome: 'Ana' })
+      .mockResolvedValueOnce(null);
+    prisma.processo.create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('unique', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
+
+    const csv = [
+      'numero,status,clienteCpf,clienteCnpj',
+      '0000001-46.2024.8.26.0100,Em andamento,39053344705,',
+      '0000002-41.2024.8.26.0100,Em andamento,,11222333000181',
+    ].join('\n');
+    const resultado = await service.importarCsv(csv, 'u1');
+    expect(resultado.duplicados).toBe(1);
+    expect(resultado.erros).toBe(1);
+    expect(resultado.criados).toBe(0);
   });
 });

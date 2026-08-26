@@ -29,7 +29,9 @@ describe('ChatController', () => {
 
   it('listarConversas usa userId', async () => {
     chatService.listarConversas.mockResolvedValue([]);
-    await expect(controller.listarConversas({ id: 'u1' })).resolves.toEqual([]);
+    await expect(
+      controller.listarConversas({ id: 'u1', role: Role.ADMIN }),
+    ).resolves.toEqual([]);
     expect(chatService.listarConversas).toHaveBeenCalledWith('u1');
   });
 
@@ -37,11 +39,11 @@ describe('ChatController', () => {
     chatService.criarConversa.mockResolvedValue({ id: 'c1' });
     chatService.obterConversa.mockResolvedValue({ id: 'c1' });
     await expect(
-      controller.criarConversa({ id: 'u1' }, { titulo: 'Geral' }),
+      controller.criarConversa({ id: 'u1', role: Role.ADMIN }, { titulo: 'Geral' }),
     ).resolves.toEqual({ id: 'c1' });
-    await expect(controller.obterConversa({ id: 'u1' }, 'c1')).resolves.toEqual(
-      { id: 'c1' },
-    );
+    await expect(
+      controller.obterConversa({ id: 'u1', role: Role.ADMIN }, 'c1'),
+    ).resolves.toEqual({ id: 'c1' });
   });
 
   it('porProcesso obtém ou cria conversa', async () => {
@@ -59,11 +61,13 @@ describe('ChatController', () => {
     chatService.enviarMensagem.mockResolvedValue({ id: 'm1' });
     chatService.removerConversa.mockResolvedValue({ ok: true });
     await expect(
-      controller.enviarMensagem({ id: 'u1' }, 'c1', {
+      controller.enviarMensagem({ id: 'u1', role: Role.ADMIN }, 'c1', {
         conteudo: 'Olá',
       }),
     ).resolves.toEqual({ id: 'm1' });
-    await expect(controller.remover({ id: 'u1' }, 'c1')).resolves.toEqual({
+    await expect(
+      controller.remover({ id: 'u1', role: Role.ADMIN }, 'c1'),
+    ).resolves.toEqual({
       ok: true,
     });
   });

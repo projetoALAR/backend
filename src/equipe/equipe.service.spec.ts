@@ -24,6 +24,9 @@ describe('EquipeService', () => {
 
   const notificacoes = {
     notificarTodosUsuarios: jest.fn(),
+    enviarEmailTransacional: jest.fn().mockResolvedValue({ sent: true }),
+    appPublicUrl: jest.fn().mockReturnValue('http://localhost:3000'),
+    criarInbox: jest.fn().mockResolvedValue({}),
   };
 
   const documentos = {
@@ -38,6 +41,7 @@ describe('EquipeService', () => {
       prisma as unknown as PrismaService,
       notificacoes as unknown as NotificacoesService,
       documentos as unknown as DocumentosService,
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
   });
 
@@ -101,5 +105,60 @@ describe('EquipeService', () => {
         senha: 'senha-forte',
       }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('importarArquivo cria membro e marca e-mail inválido sem parar o lote', async () => {
+    prisma.$transaction.mockImplementation(
+      async (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma),
+    );
+    prisma.membroEquipe.findUnique.mockResolvedValue(null);
+    prisma.usuario.findUnique.mockResolvedValue(null);
+    prisma.usuario.create.mockResolvedValue({
+      id: 'u-new',
+      nome: 'Ana',
+      email: 'ana@alar.com.br',
+      role: Role.ASSISTENTE,
+    });
+    prisma.preferencia.create.mockResolvedValue({});
+    prisma.membroEquipe.create.mockResolvedValue({
+      id: 'm-new',
+      nome: 'Ana',
+      email: 'ana@alar.com.br',
+      cargo: 'Assistente',
+      status: 'active',
+      usuarioId: 'u-new',
+      usuario: { id: 'u-new', role: Role.ASSISTENTE, fotoUrl: null },
+    });
+
+    const csv = [
+      'Nome,E-mail,Papel,Senha',
+      'Ana,ana@alar.com.br,ASSISTENTE,AlarTrocar123',
+      'Sem Email,nao-email,ASSISTENTE,AlarTrocar123',
+    ].join('\n');
+
+    const resultado = await service.importarArquivo(
+      Buffer.from(csv, 'utf8'),
+      'equipe.csv',
+      'text/csv',
+      null,
+      'AlarTrocar123',
+    );
+
+    expect(resultado.criados).toBe(1);
+    expect(resultado.erros).toBe(1);
+    expect(resultado.resultados.some((r) => r.status === 'erro')).toBe(true);
+  });
+
+  it('importarArquivo rejeita mapeamento sem nome/email', async () => {
+    const csv = 'ColA,ColB\nx,y\n';
+    await expect(
+      service.importarArquivo(
+        Buffer.from(csv, 'utf8'),
+        'equipe.csv',
+        'text/csv',
+        { '0': 'cargo' },
+        'AlarTrocar123',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

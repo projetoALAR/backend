@@ -187,6 +187,10 @@ model Usuario {
   totpPendingSecret  String?
   totpEnabled        Boolean  @default(false)
   totpRecoveryHashes String[] @default([])
+  /** Obriga troca de senha no próximo login (import/convite). */
+  mustChangePassword Boolean  @default(false)
+  passwordResetToken String?
+  passwordResetExpires DateTime?
   criadoEm           DateTime @default(now())
 
   preferencia  Preferencia?
@@ -199,6 +203,33 @@ model Usuario {
   comentariosProcesso        ProcessoComentario[]
   tarefasCriadas             ProcessoTarefa[] @relation("ProcessoTarefaCriador")
   documentosRevisados        Documento[]
+  assinatura                 Assinatura?
+}
+
+/// Assinatura comercial (Asaas) vinculada ao usuário dono da conta.
+model Assinatura {
+  id                  String   @id @default(uuid())
+  usuarioId           String   @unique
+  usuario             Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  /// essencial | profissional | escritorio
+  planoId             String
+  /// MONTHLY | YEARLY
+  ciclo               String
+  /// trial | pending | ativa | past_due | cancelada
+  status              String
+  valor               Float?
+  cpfCnpj             String?
+  asaasCustomerId     String?
+  asaasSubscriptionId String?
+  invoiceUrl          String?
+  trialAte            DateTime?
+  vigenteAte          DateTime?
+  criadoEm            DateTime @default(now())
+  atualizadoEm        DateTime @updatedAt
+
+  @@index([status])
+  @@index([asaasSubscriptionId])
+  @@index([asaasCustomerId])
 }
 
 model Preferencia {
@@ -265,6 +296,7 @@ model Mensagem {
   fontes        Json?
   tokensUsados  Int?
   feedback      String?
+  feedbackMotivo String?
   criadoEm      DateTime @default(now())
 
   conversacaoId String

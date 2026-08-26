@@ -12,6 +12,57 @@ import { DocumentosService } from '../documentos/documentos.service';
 import { Role } from '../auth/roles';
 import { CreateMembroDto, UpdateMembroDto } from './equipe.dto';
 import { assertSenhaForte } from '../auth/password-policy';
+import { BillingService } from '../billing/billing.service';
+import {
+  CAMPOS_ALVO_EQUIPE,
+  linhasDeTabelaEquipe,
+  normalizarRoleEquipe,
+  normalizarStatusEquipe,
+  sugerirColunaEquipe,
+  type LinhaImportacaoEquipe,
+} from './equipe-importacao.util';
+import { montarModeloEquipeXlsx } from '../importacao/planilha-importacao.util';
+import {
+  aplicarMapeamento,
+  lerTabelaDeArquivo,
+  montarPreview,
+  type MapeamentoColunas,
+  type PreviewImportacao,
+  validarMapeamento,
+} from '../importacao/importacao-mapeamento.util';
+
+export const MAX_LINHAS_IMPORTACAO_EQUIPE = 100;
+
+export type ResultadoLinhaImportacaoEquipe = {
+  linha: number;
+  status: 'criado' | 'duplicado' | 'erro';
+  nome?: string;
+  email?: string;
+  membroId?: string;
+  motivo?: string;
+};
+
+export type ResultadoImportacaoEquipe = {
+  total: number;
+  criados: number;
+  duplicados: number;
+  erros: number;
+  resultados: ResultadoLinhaImportacaoEquipe[];
+};
+
+function mensagemErroImportacao(err: unknown): string {
+  if (err instanceof BadRequestException || err instanceof ConflictException) {
+    const res = err.getResponse();
+    if (typeof res === 'string') return res;
+    if (res && typeof res === 'object' && 'message' in res) {
+      const msg = (res as { message?: string | string[] }).message;
+      if (Array.isArray(msg)) return msg.join('; ');
+      if (typeof msg === 'string') return msg;
+    }
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return 'Falha ao importar';
+}
 
 const membroInclude = {
   usuario: {
@@ -44,6 +95,7 @@ export class EquipeService {
     private prisma: PrismaService,
     private notificacoes: NotificacoesService,
     private documentos: DocumentosService,
+    private billing: BillingService,
   ) {}
 
   private async withSignedAvatar(membro: MembroComUsuario) {
@@ -59,7 +111,10 @@ export class EquipeService {
     };
   }
 
-  async criar(dados: CreateMembroDto) {
+  async criar(
+    dados: CreateMembroDto,
+    opcoes?: { silencioso?: boolean },
+  ) {
     const email = dados.email.trim().toLowerCase();
     const nome = dados.nome.trim();
     const cargo = dados.cargo.trim();
@@ -94,12 +149,15 @@ export class EquipeService {
           throw new BadRequestException('Papel inválido');
         }
 
+        await this.billing.assertPodeAdicionarUsuario();
+
         usuario = await tx.usuario.create({
           data: {
             nome,
             email,
             senhaHash: await bcrypt.hash(dados.senha, 10),
             role,
+            mustChangePassword: true,
           },
         });
 
@@ -124,14 +182,228 @@ export class EquipeService {
       });
     });
 
-    await this.notificacoes.notificarTodosUsuarios(
-      'Novo membro na equipe',
-      `${membro.nome} (${membro.cargo}) foi adicionado à equipe.`,
-      '/equipe',
-      'teamUpdates',
-    );
+    if (!opcoes?.silencioso) {
+      await this.notificacoes.notificarTodosUsuarios(
+        'Novo membro na equipe',
+        `${membro.nome} (${membro.cargo}) foi adicionado à equipe.`,
+        '/equipe',
+        'teamUpdates',
+      );
+    }
+
+    if (dados.senha && membro.usuarioId) {
+      await this.enviarConviteMembro(
+        { id: membro.usuarioId, nome: membro.nome, email: membro.email },
+        dados.senha,
+      );
+    }
 
     return this.withSignedAvatar(membro);
+  }
+
+  async enviarConviteMembro(
+    user: { id: string; nome: string; email: string },
+    senhaTemporaria: string,
+  ) {
+    const base = this.notificacoes.appPublicUrl().replace(/\/$/, '');
+    await this.notificacoes.enviarEmailTransacional({
+      para: user.email,
+      assunto: 'Bem-vindo ao Alar — acesso criado',
+      titulo: 'Conta criada',
+      corpo: [
+        `Olá, ${user.nome}.`,
+        '',
+        'Sua conta no Alar foi criada pela equipe do escritório.',
+        `Senha temporária: ${senhaTemporaria}`,
+        '',
+        'No primeiro acesso você deverá trocar a senha.',
+        `E-mail de login: ${user.email}`,
+      ].join('\n'),
+      link: `${base}/login`,
+      linkRotulo: 'Entrar no Alar',
+    });
+    await this.notificacoes.criarInbox({
+      usuarioId: user.id,
+      titulo: 'Bem-vindo ao Alar',
+      corpo:
+        'Sua conta foi criada. Troque a senha temporária no primeiro acesso.',
+      tipo: 'sistema',
+      link: '/trocar-senha',
+    });
+  }
+
+  async modeloXlsx(): Promise<Buffer> {
+    return montarModeloEquipeXlsx();
+  }
+
+  async previewArquivo(
+    buffer: Buffer,
+    nomeArquivo: string,
+    mime?: string,
+  ): Promise<PreviewImportacao> {
+    try {
+      const tabela = await lerTabelaDeArquivo(buffer, nomeArquivo, mime);
+      return montarPreview(
+        tabela,
+        [...CAMPOS_ALVO_EQUIPE],
+        (h) => sugerirColunaEquipe(h),
+      );
+    } catch (err) {
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'Arquivo inválido',
+      );
+    }
+  }
+
+  async importarArquivo(
+    buffer: Buffer,
+    nomeArquivo: string,
+    mime?: string,
+    mapeamento?: MapeamentoColunas | null,
+    senhaPadrao?: string | null,
+  ): Promise<ResultadoImportacaoEquipe> {
+    let linhas: LinhaImportacaoEquipe[];
+    try {
+      const tabela = await lerTabelaDeArquivo(buffer, nomeArquivo, mime);
+      if (mapeamento && Object.keys(mapeamento).length > 0) {
+        const erroMap = validarMapeamento(mapeamento, [...CAMPOS_ALVO_EQUIPE]);
+        if (erroMap) throw new BadRequestException(erroMap);
+        linhas = aplicarMapeamento<LinhaImportacaoEquipe>(tabela, mapeamento);
+      } else {
+        linhas = linhasDeTabelaEquipe(tabela);
+      }
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'Arquivo inválido',
+      );
+    }
+
+    if (linhas.length === 0) {
+      throw new BadRequestException(
+        'Arquivo sem linhas de dados. Preencha a aba Dados do modelo.',
+      );
+    }
+    if (linhas.length > MAX_LINHAS_IMPORTACAO_EQUIPE) {
+      throw new BadRequestException(
+        `Limite de ${MAX_LINHAS_IMPORTACAO_EQUIPE} membros por importação.`,
+      );
+    }
+
+    if (senhaPadrao?.trim()) {
+      try {
+        assertSenhaForte(senhaPadrao.trim());
+      } catch (err) {
+        throw new BadRequestException(
+          err instanceof Error
+            ? `Senha padrão inválida: ${err.message}`
+            : 'Senha padrão inválida',
+        );
+      }
+    }
+
+    const resultados: ResultadoLinhaImportacaoEquipe[] = [];
+    let criados = 0;
+    let duplicados = 0;
+    let erros = 0;
+    const emailsNoArquivo = new Set<string>();
+
+    for (const linha of linhas) {
+      const nome = linha.nome?.trim();
+      const email = linha.email?.trim().toLowerCase();
+      if (!nome || nome.length < 2) {
+        erros += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'erro',
+          motivo: 'Nome obrigatório (mín. 2 caracteres)',
+        });
+        continue;
+      }
+      if (!email || !email.includes('@')) {
+        erros += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'erro',
+          nome,
+          motivo: 'E-mail inválido',
+        });
+        continue;
+      }
+      if (emailsNoArquivo.has(email)) {
+        duplicados += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'duplicado',
+          nome,
+          email,
+          motivo: 'E-mail repetido neste arquivo',
+        });
+        continue;
+      }
+      emailsNoArquivo.add(email);
+
+      const role = normalizarRoleEquipe(linha.role);
+      if (!role) {
+        erros += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'erro',
+          nome,
+          email,
+          motivo: 'Papel inválido. Use ADMIN, ADVOGADO ou ASSISTENTE',
+        });
+        continue;
+      }
+
+      const cargo =
+        linha.cargo?.trim() || cargoPadraoPorRole(role);
+      const status = normalizarStatusEquipe(linha.status);
+      const senha = linha.senha?.trim() || senhaPadrao?.trim() || undefined;
+
+      try {
+        const criado = await this.criar(
+          { nome, email, cargo, role, status, senha },
+          { silencioso: true },
+        );
+        criados += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'criado',
+          nome: criado.nome,
+          email: criado.email,
+          membroId: criado.id,
+        });
+      } catch (err) {
+        if (err instanceof ConflictException) {
+          duplicados += 1;
+          resultados.push({
+            linha: linha.linha,
+            status: 'duplicado',
+            nome,
+            email,
+            motivo: mensagemErroImportacao(err),
+          });
+          continue;
+        }
+        erros += 1;
+        resultados.push({
+          linha: linha.linha,
+          status: 'erro',
+          nome,
+          email,
+          motivo: mensagemErroImportacao(err),
+        });
+      }
+    }
+
+    return {
+      total: linhas.length,
+      criados,
+      duplicados,
+      erros,
+      resultados,
+    };
   }
 
   async listarTodos() {

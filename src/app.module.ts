@@ -9,6 +9,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
+import { MustChangePasswordGuard } from './auth/must-change-password.guard';
 import { ClientesModule } from './clientes/clientes.module';
 import { ProcessosModule } from './processos/processos.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -24,6 +25,8 @@ import { PeticoesModule } from './peticoes/peticoes.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
 import { CasoAcessoModule } from './casos-acesso/caso-acesso.module';
 import { BuscaModule } from './busca/busca.module';
+import { BillingModule } from './billing/billing.module';
+import { SubscriptionGuard } from './billing/subscription.guard';
 import { PrismaService } from './prisma.service';
 import { RequestLoggingMiddleware } from './common/request-logging.middleware';
 
@@ -55,6 +58,7 @@ import { RequestLoggingMiddleware } from './common/request-logging.middleware';
     AuditoriaModule,
     CasoAcessoModule,
     BuscaModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [
@@ -67,6 +71,14 @@ import { RequestLoggingMiddleware } from './common/request-logging.middleware';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: MustChangePasswordGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: SubscriptionGuard,
     },
     {
       provide: APP_GUARD,
