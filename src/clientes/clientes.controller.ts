@@ -33,7 +33,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
 import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
-import { ListarPaginadoQueryDto } from '../common/paginacao.dto';
+import { parseQueryInt, parseQueryString } from '../common/paginacao.dto';
 
 @Controller('clientes')
 @ApiTags('Clientes')
@@ -186,9 +186,15 @@ export class ClientesController {
   @ApiOkResponse({ type: ClienteRespostaDto, isArray: true })
   async listarTodos(
     @CurrentUser() user: CasoAcessoUser,
-    @Query() query: ListarPaginadoQueryDto,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('q') q?: string,
   ) {
-    return this.clientesService.listarTodos(user, query);
+    return this.clientesService.listarTodos(user, {
+      page: parseQueryInt(page),
+      limit: parseQueryInt(limit),
+      q: parseQueryString(q),
+    });
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO)

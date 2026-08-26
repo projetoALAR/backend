@@ -31,7 +31,7 @@ import {
   UpdateProcessoDto,
   CreateProcessoComentarioDto,
   GerarRelatorioPdfDto,
-  ListarProcessosQueryDto,
+  splitCsv,
 } from './processos.dto';
 import { ProcessoRespostaDto } from '../openapi/respostas.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -41,6 +41,10 @@ import { ProcessosCapaService } from './processos-capa.service';
 import { ProcessosRelatorioPdfService } from './processos-relatorio-pdf.service';
 import type { AuditActor } from '../auditoria/auditoria.types';
 import type { CasoAcessoUser } from '../casos-acesso/caso-acesso.service';
+import {
+  parseQueryInt,
+  parseQueryString,
+} from '../common/paginacao.dto';
 
 @Controller('processos')
 @ApiTags('Processos')
@@ -199,9 +203,30 @@ export class ProcessosController {
   @ApiOkResponse({ type: ProcessoRespostaDto, isArray: true })
   async listarTodos(
     @CurrentUser() user: CasoAcessoUser,
-    @Query() query: ListarProcessosQueryDto,
+    // Query por nome: ValidationPipe+whitelist pode esvaziar o DTO em prod.
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('q') q?: string,
+    @Query('situacao') situacao?: string,
+    @Query('status') status?: string | string[],
+    @Query('prioridade') prioridade?: string | string[],
+    @Query('prazoDe') prazoDe?: string,
+    @Query('prazoAte') prazoAte?: string,
   ) {
-    return this.processosService.listarTodos(user, query);
+    const situacaoOk =
+      situacao === 'ativos' || situacao === 'concluidos'
+        ? situacao
+        : undefined;
+    return this.processosService.listarTodos(user, {
+      page: parseQueryInt(page),
+      limit: parseQueryInt(limit),
+      q: parseQueryString(q),
+      situacao: situacaoOk,
+      status: splitCsv(status),
+      prioridade: splitCsv(prioridade),
+      prazoDe: parseQueryString(prazoDe),
+      prazoAte: parseQueryString(prazoAte),
+    });
   }
 
   @Roles(Role.ADMIN, Role.ADVOGADO, Role.ASSISTENTE)

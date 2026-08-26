@@ -253,7 +253,7 @@ export class GerarRelatorioPdfDto {
   linhas!: LinhaRelatorioPdfDto[];
 }
 
-function splitCsv(value: unknown): string[] | undefined {
+export function splitCsv(value: unknown): string[] | undefined {
   if (value == null || value === '') return undefined;
   if (Array.isArray(value)) {
     return value.map(String).flatMap((v) => v.split(',')).map((s) => s.trim()).filter(Boolean);
