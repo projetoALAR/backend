@@ -12,6 +12,7 @@ import { DocumentosService } from '../documentos/documentos.service';
 import { Role } from '../auth/roles';
 import { CreateMembroDto, UpdateMembroDto } from './equipe.dto';
 import { assertSenhaForte } from '../auth/password-policy';
+import { BillingService } from '../billing/billing.service';
 import {
   CAMPOS_ALVO_EQUIPE,
   linhasDeTabelaEquipe,
@@ -94,6 +95,7 @@ export class EquipeService {
     private prisma: PrismaService,
     private notificacoes: NotificacoesService,
     private documentos: DocumentosService,
+    private billing: BillingService,
   ) {}
 
   private async withSignedAvatar(membro: MembroComUsuario) {
@@ -146,6 +148,8 @@ export class EquipeService {
         if (!Object.values(Role).includes(role)) {
           throw new BadRequestException('Papel inválido');
         }
+
+        await this.billing.assertPodeAdicionarUsuario();
 
         usuario = await tx.usuario.create({
           data: {

@@ -21,17 +21,18 @@ export class BillingController {
   constructor(private readonly billing: BillingService) {}
 
   @Get('assinatura')
-  minha(@CurrentUser() user: { id: string }) {
-    return this.billing.minhaAssinatura(user.id);
+  minha(@CurrentUser() user: { id: string; role: string }) {
+    return this.billing.minhaAssinatura(user.id, user.role);
   }
 
   @Post('checkout')
+  @Roles(Role.ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   checkout(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: { id: string; role: string },
     @Body() body: CheckoutBillingDto,
   ) {
-    return this.billing.iniciarCheckout(user.id, body);
+    return this.billing.iniciarCheckout(user.id, body, user.role);
   }
 
   @Public()

@@ -41,6 +41,7 @@ describe('EquipeService', () => {
       prisma as unknown as PrismaService,
       notificacoes as unknown as NotificacoesService,
       documentos as unknown as DocumentosService,
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
   });
 

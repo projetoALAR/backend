@@ -21,11 +21,19 @@ describe('ChatQuotaService', () => {
     }),
   } as unknown as ConfigService;
 
+  const billing = {
+    tokensDiaDoUsuario: jest.fn().mockResolvedValue(null),
+  };
+
   let service: ChatQuotaService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new ChatQuotaService(prisma as unknown as PrismaService, config);
+    service = new ChatQuotaService(
+      prisma as unknown as PrismaService,
+      config,
+      billing as never,
+    );
   });
 
   it('bloqueia quando uso + estimativa excede limite', async () => {
@@ -52,9 +60,14 @@ describe('ChatQuotaService', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('admin tem limite maior por padrão', () => {
-    expect(service.limiteDiario(Role.ADMIN)).toBe(500_000);
-    expect(service.limiteDiario(Role.ADVOGADO)).toBe(1000);
+  it('admin tem limite maior por padrão (sem plano)', async () => {
+    await expect(service.limiteDiario('u1', Role.ADMIN)).resolves.toBe(500_000);
+    await expect(service.limiteDiario('u1', Role.ADVOGADO)).resolves.toBe(1000);
+  });
+
+  it('usa tokens do plano quando há assinatura', async () => {
+    billing.tokensDiaDoUsuario.mockResolvedValueOnce(50_000);
+    await expect(service.limiteDiario('u1', Role.ADVOGADO)).resolves.toBe(50_000);
   });
 
   it('registra feedback util', async () => {

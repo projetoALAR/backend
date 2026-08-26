@@ -6,9 +6,10 @@ import { ChatContextService } from './chat-context.service';
 import { ChatQuotaService } from './chat-quota.service';
 import { PrismaService } from '../prisma.service';
 import { DocumentosModule } from '../documentos/documentos.module';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
-  imports: [DocumentosModule],
+  imports: [DocumentosModule, BillingModule],
   controllers: [ChatController],
   providers: [
     ChatService,

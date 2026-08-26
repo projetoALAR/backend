@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma.service';
 import { Role } from '../auth/roles';
+import { BillingService } from '../billing/billing.service';
 
 export type ChatQuotaResumo = {
   usados: number;
@@ -20,15 +21,23 @@ export class ChatQuotaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly billing: BillingService,
   ) {}
 
-  limiteDiario(role?: Role): number {
+  /** Fallback por role quando não há plano ativo (dev). */
+  limiteDiarioFallback(role?: Role): number {
     if (role === Role.ADMIN) {
       return Number(
         this.config.get<string>('CHAT_DAILY_TOKEN_LIMIT_ADMIN') || 500_000,
       );
     }
     return Number(this.config.get<string>('CHAT_DAILY_TOKEN_LIMIT') || 100_000);
+  }
+
+  async limiteDiario(usuarioId: string, role?: Role): Promise<number> {
+    const doPlano = await this.billing.tokensDiaDoUsuario(usuarioId);
+    if (doPlano != null) return doPlano;
+    return this.limiteDiarioFallback(role);
   }
 
   inicioDoDia(): Date {
@@ -52,7 +61,7 @@ export class ChatQuotaService {
 
   async resumo(usuarioId: string, role?: Role): Promise<ChatQuotaResumo> {
     const usados = await this.obterUsoDiario(usuarioId);
-    const limite = this.limiteDiario(role);
+    const limite = await this.limiteDiario(usuarioId, role);
     return {
       usados,
       limite,

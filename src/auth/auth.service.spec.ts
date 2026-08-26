@@ -49,6 +49,8 @@ describe('AuthService.changePassword', () => {
       new LoginLockoutService(),
       new TotpService(),
       notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
   });
 
@@ -144,6 +146,8 @@ describe('AuthService.createUserByAdmin', () => {
       new LoginLockoutService(),
       new TotpService(),
       notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
 
     const result = await service.createUserByAdmin({
@@ -189,6 +193,8 @@ describe('AuthService.login lockout', () => {
       lockout,
       new TotpService(),
       notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
@@ -231,6 +237,8 @@ describe('AuthService.login 2FA', () => {
       new LoginLockoutService(),
       new TotpService(),
       notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
@@ -272,6 +280,8 @@ describe('AuthService.login 2FA', () => {
       new LoginLockoutService(),
       new TotpService(),
       notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
@@ -297,6 +307,8 @@ describe('AuthService.login 2FA', () => {
       new LoginLockoutService(),
       new TotpService(),
       notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
 
     await expect(
@@ -336,6 +348,8 @@ describe('AuthService.login 2FA', () => {
       new LoginLockoutService(),
       { verifyCode: jest.fn().mockReturnValue(true) } as unknown as TotpService,
       notificacoesMock,
+
+      { assertPodeAdicionarUsuario: jest.fn() } as never,
     );
 
     await expect(
@@ -360,6 +374,8 @@ describe('AuthService 2FA setup', () => {
     new LoginLockoutService(),
     new TotpService(),
     notificacoesMock,
+
+    { assertPodeAdicionarUsuario: jest.fn() } as never,
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -400,6 +416,8 @@ describe('AuthService.adminDisableTwoFactor', () => {
     new LoginLockoutService(),
     new TotpService(),
     notificacoesMock,
+
+    { assertPodeAdicionarUsuario: jest.fn() } as never,
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -460,6 +478,8 @@ describe('AuthService admin senha', () => {
     new LoginLockoutService(),
     new TotpService(),
     notificacoesMock,
+
+    { assertPodeAdicionarUsuario: jest.fn() } as never,
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -527,6 +547,8 @@ describe('AuthService forgot/reset password', () => {
     new LoginLockoutService(),
     new TotpService(),
     notificacoesMock,
+
+    { assertPodeAdicionarUsuario: jest.fn() } as never,
   );
 
   beforeEach(() => jest.clearAllMocks());

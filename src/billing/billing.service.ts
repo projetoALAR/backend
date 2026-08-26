@@ -12,15 +12,30 @@ import { AsaasClient } from './asaas.client';
 import {
   CicloCobranca,
   isPlanoId,
+  limitesDoPlano,
   PLANOS_COMERCIAIS,
   PlanoId,
   valorDoPlano,
 } from './planos.config';
+import { Role } from '../auth/roles';
 
 type AsaasCustomer = { id: string };
 type AsaasSubscription = { id: string; status?: string };
 type AsaasPaymentList = {
   data?: Array<{ id: string; invoiceUrl?: string; bankSlipUrl?: string; status?: string }>;
+};
+
+type AssinaturaRow = {
+  id: string;
+  usuarioId: string;
+  planoId: string;
+  ciclo: string;
+  status: string;
+  valor: number | null;
+  invoiceUrl: string | null;
+  trialAte: Date | null;
+  vigenteAte: Date | null;
+  atualizadoEm: Date;
 };
 
 export type CheckoutDto = {
@@ -43,6 +58,11 @@ export class BillingService {
 
   asaasHabilitado() {
     return this.asaas.habilitado();
+  }
+
+  private enforceAtivo(): boolean {
+    const v = this.config.get<string>('REQUIRE_SUBSCRIPTION')?.trim();
+    return v === 'true' || v === '1';
   }
 
   private normalizeCiclo(raw?: string): CicloCobranca {
@@ -89,37 +109,215 @@ export class BillingService {
     return false;
   }
 
-  async usuarioTemAcesso(usuarioId: string): Promise<boolean> {
-    const row = await this.prisma.assinatura.findUnique({
-      where: { usuarioId },
-    });
-    return this.temAcesso(row);
-  }
-
-  async minhaAssinatura(usuarioId: string) {
-    const row = await this.prisma.assinatura.findUnique({
-      where: { usuarioId },
-    });
+  private serializarAssinatura(row: AssinaturaRow) {
     return {
-      asaasConfigurado: this.asaasHabilitado(),
-      temAcesso: this.temAcesso(row),
-      assinatura: row
-        ? {
-            id: row.id,
-            planoId: row.planoId,
-            ciclo: row.ciclo,
-            status: row.status,
-            valor: row.valor,
-            invoiceUrl: row.invoiceUrl,
-            trialAte: row.trialAte?.toISOString() ?? null,
-            vigenteAte: row.vigenteAte?.toISOString() ?? null,
-            atualizadoEm: row.atualizadoEm.toISOString(),
-          }
-        : null,
+      id: row.id,
+      planoId: row.planoId,
+      ciclo: row.ciclo,
+      status: row.status,
+      valor: row.valor,
+      invoiceUrl: row.invoiceUrl,
+      trialAte: row.trialAte?.toISOString() ?? null,
+      vigenteAte: row.vigenteAte?.toISOString() ?? null,
+      atualizadoEm: row.atualizadoEm.toISOString(),
     };
   }
 
-  async iniciarCheckout(usuarioId: string, dto: CheckoutDto) {
+  /**
+   * Single-tenant: a assinatura ativa de um ADMIN cobre todo o escritório.
+   * Se o usuário tem assinatura própria com acesso, ela prevalece.
+   */
+  async obterAssinaturaEfetiva(usuarioId: string): Promise<{
+    row: AssinaturaRow | null;
+    pagadorId: string | null;
+    compartilhada: boolean;
+  }> {
+    const propria = await this.prisma.assinatura.findUnique({
+      where: { usuarioId },
+    });
+    if (propria && this.temAcesso(propria)) {
+      return {
+        row: propria as AssinaturaRow,
+        pagadorId: usuarioId,
+        compartilhada: false,
+      };
+    }
+
+    const admins = await this.prisma.usuario.findMany({
+      where: { role: Role.ADMIN },
+      select: {
+        id: true,
+        assinatura: true,
+      },
+    });
+
+    for (const admin of admins) {
+      if (!admin.assinatura || !this.temAcesso(admin.assinatura)) continue;
+      return {
+        row: admin.assinatura as AssinaturaRow,
+        pagadorId: admin.id,
+        compartilhada: admin.id !== usuarioId,
+      };
+    }
+
+    if (propria) {
+      return {
+        row: propria as AssinaturaRow,
+        pagadorId: usuarioId,
+        compartilhada: false,
+      };
+    }
+
+    for (const admin of admins) {
+      if (!admin.assinatura) continue;
+      return {
+        row: admin.assinatura as AssinaturaRow,
+        pagadorId: admin.id,
+        compartilhada: admin.id !== usuarioId,
+      };
+    }
+
+    return { row: null, pagadorId: null, compartilhada: false };
+  }
+
+  async usuarioTemAcesso(usuarioId: string): Promise<boolean> {
+    const { row } = await this.obterAssinaturaEfetiva(usuarioId);
+    return this.temAcesso(row);
+  }
+
+  async planoEfetivoId(usuarioId: string): Promise<PlanoId | null> {
+    const { row } = await this.obterAssinaturaEfetiva(usuarioId);
+    if (!row || !this.temAcesso(row) || !isPlanoId(row.planoId)) return null;
+    return row.planoId;
+  }
+
+  async tokensDiaDoUsuario(usuarioId: string): Promise<number | null> {
+    const planoId = await this.planoEfetivoId(usuarioId);
+    return limitesDoPlano(planoId)?.tokensDia ?? null;
+  }
+
+  async usoEscritorio() {
+    const [usuarios, docsAgg] = await Promise.all([
+      this.prisma.usuario.count(),
+      this.prisma.documento.aggregate({ _sum: { tamanho: true } }),
+    ]);
+    const bytes = docsAgg._sum.tamanho ?? 0;
+    return {
+      usuarios,
+      bytesDocumentos: bytes,
+      gbDocumentos: Math.round((bytes / (1024 * 1024 * 1024)) * 1000) / 1000,
+    };
+  }
+
+  /**
+   * Bloqueia novo usuário se o plano do escritório estourou assentos.
+   * Com REQUIRE_SUBSCRIPTION off e sem plano, não limita (dev/demo).
+   */
+  async assertPodeAdicionarUsuario() {
+    const uso = await this.usoEscritorio();
+    const admins = await this.prisma.usuario.findMany({
+      where: { role: Role.ADMIN },
+      select: { id: true, assinatura: true },
+    });
+
+    let limite: number | null = null;
+    for (const admin of admins) {
+      if (admin.assinatura && this.temAcesso(admin.assinatura)) {
+        limite = limitesDoPlano(admin.assinatura.planoId)?.maxUsuarios ?? null;
+        break;
+      }
+    }
+
+    if (limite == null) {
+      if (!this.enforceAtivo()) return;
+      // Paywall on sem plano: só o primeiro usuário (dono)
+      if (uso.usuarios >= 1) {
+        throw new ForbiddenException({
+          statusCode: 403,
+          message:
+            'Ative um plano para adicionar membros à equipe.',
+          code: 'PLAN_SEAT_LIMIT',
+        });
+      }
+      return;
+    }
+
+    if (uso.usuarios >= limite) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        message: `Limite do plano atingido (${uso.usuarios}/${limite} usuários). Faça upgrade para adicionar mais pessoas.`,
+        code: 'PLAN_SEAT_LIMIT',
+      });
+    }
+  }
+
+  async assertPodeArmazenarBytes(bytesNovos: number) {
+    if (bytesNovos <= 0) return;
+    const admins = await this.prisma.usuario.findMany({
+      where: { role: Role.ADMIN },
+      select: { assinatura: true },
+    });
+    let maxGb: number | null = null;
+    for (const admin of admins) {
+      if (admin.assinatura && this.temAcesso(admin.assinatura)) {
+        maxGb = limitesDoPlano(admin.assinatura.planoId)?.maxGbDocumentos ?? null;
+        break;
+      }
+    }
+    if (maxGb == null) return;
+
+    const uso = await this.usoEscritorio();
+    const limiteBytes = maxGb * 1024 * 1024 * 1024;
+    if (uso.bytesDocumentos + bytesNovos > limiteBytes) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        message: `Limite de armazenamento do plano atingido (${uso.gbDocumentos.toFixed(2)} / ${maxGb} GB).`,
+        code: 'PLAN_STORAGE_LIMIT',
+      });
+    }
+  }
+
+  async minhaAssinatura(
+    usuarioId: string,
+    role?: string,
+  ) {
+    const efetiva = await this.obterAssinaturaEfetiva(usuarioId);
+    const row = efetiva.row;
+    const acesso = this.temAcesso(row);
+    const limites = acesso ? limitesDoPlano(row?.planoId) : null;
+    const uso = await this.usoEscritorio();
+    const ePagador = Boolean(
+      efetiva.pagadorId && efetiva.pagadorId === usuarioId,
+    );
+
+    return {
+      asaasConfigurado: this.asaasHabilitado(),
+      temAcesso: acesso,
+      /** Quem paga / fez o checkout (ADMIN). */
+      ePagador,
+      compartilhada: efetiva.compartilhada,
+      podeCheckout: role === Role.ADMIN,
+      assinatura: row ? this.serializarAssinatura(row) : null,
+      uso: {
+        usuarios: uso.usuarios,
+        limiteUsuarios: limites?.maxUsuarios ?? null,
+        gbDocumentos: uso.gbDocumentos,
+        limiteGbDocumentos: limites?.maxGbDocumentos ?? null,
+        tokensDia: limites?.tokensDia ?? null,
+      },
+    };
+  }
+
+  async iniciarCheckout(
+    usuarioId: string,
+    dto: CheckoutDto,
+    role?: string,
+  ) {
+    if (role && role !== Role.ADMIN) {
+      throw new ForbiddenException(
+        'Somente o administrador do escritório pode assinar ou iniciar o trial.',
+      );
+    }
     if (!isPlanoId(dto.planoId)) {
       throw new BadRequestException('Plano inválido.');
     }
@@ -179,7 +377,7 @@ export class BillingService {
         modo: 'trial_local' as const,
         checkoutUrl: null,
         mensagem: `Avaliação de ${trialDias} dias ativada (Asaas ainda não configurado).`,
-        ...(await this.minhaAssinatura(usuarioId)),
+        ...(await this.minhaAssinatura(usuarioId, Role.ADMIN)),
         assinaturaId: row.id,
       };
     }
@@ -288,7 +486,7 @@ export class BillingService {
       mensagem: usarTrial
         ? `Avaliação de ${trialDias} dias liberada. A 1ª cobrança Asaas vence em ${nextDueDate}.`
         : 'Assinatura criada. Conclua o pagamento na página do Asaas.',
-      ...(await this.minhaAssinatura(usuarioId)),
+      ...(await this.minhaAssinatura(usuarioId, Role.ADMIN)),
     };
   }
 

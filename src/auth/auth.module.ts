@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma.service';
 import { DocumentosModule } from '../documentos/documentos.module';
 import { EquipeModule } from '../equipe/equipe.module';
 import { NotificacoesModule } from '../notificacoes/notificacoes.module';
+import { BillingModule } from '../billing/billing.module';
 import { LoginLockoutService } from './login-lockout.service';
 import { TotpService } from './totp.service';
 
@@ -18,6 +19,7 @@ import { TotpService } from './totp.service';
     DocumentosModule,
     EquipeModule,
     NotificacoesModule,
+    BillingModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

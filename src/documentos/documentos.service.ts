@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../prisma.service';
+import { BillingService } from '../billing/billing.service';
 import { DOCUMENTO_MIME_ALLOWLIST } from './documentos.dto';
 import 'multer';
 
@@ -65,6 +66,7 @@ export class DocumentosService {
   constructor(
     private prisma: PrismaService,
     config: ConfigService,
+    private billing: BillingService,
   ) {
     this.supabase = criarClienteStorage(config);
     if (!this.supabase) {
@@ -201,6 +203,8 @@ export class DocumentosService {
       );
     }
 
+    await this.billing.assertPodeArmazenarBytes(arquivo.size);
+
     const processo = await this.prisma.processo.findUnique({
       where: { id: processoId },
     });
@@ -272,6 +276,7 @@ export class DocumentosService {
     const safeName = nomeComExt.replace(/[^\w.-]+/g, '_');
     const storagePath = `${processoId}/${Date.now()}-${safeName}`;
     const pdfBuffer = await renderizarPdfDeTexto(conteudoTexto);
+    await this.billing.assertPodeArmazenarBytes(pdfBuffer.length);
 
     const { error: uploadError } = await this.exigirStorage()
       .storage.from(BUCKET)

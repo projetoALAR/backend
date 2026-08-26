@@ -20,6 +20,7 @@ import { assertSenhaForte } from './password-policy';
 import { TotpService } from './totp.service';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
 import { randomBytes, createHash } from 'crypto';
+import { BillingService } from '../billing/billing.service';
 
 export type AuthUser = {
   id: string;
@@ -45,6 +46,7 @@ export class AuthService implements OnModuleInit {
     private readonly lockout: LoginLockoutService,
     private readonly totp: TotpService,
     private readonly notificacoes: NotificacoesService,
+    private readonly billing: BillingService,
   ) {}
 
   async onModuleInit() {
@@ -174,6 +176,8 @@ export class AuthService implements OnModuleInit {
     if (!Object.values(Role).includes(role)) {
       throw new BadRequestException('Papel inválido');
     }
+
+    await this.billing.assertPodeAdicionarUsuario();
 
     const user = await this.createUser({
       nome: dados.nome,
