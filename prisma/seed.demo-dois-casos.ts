@@ -95,6 +95,14 @@ function dataHora(iso: string): Date {
   return new Date(iso);
 }
 
+/** Data/hora local, relativa a hoje (demo sempre “viva”). */
+function daquiA(dias: number, hora = 14, minuto = 0): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + dias);
+  d.setHours(hora, minuto, 0, 0);
+  return d;
+}
+
 async function limparStorage(supabase: SupabaseClient) {
   const { data: raiz, error } = await supabase.storage
     .from(BUCKET)
@@ -279,9 +287,9 @@ async function main() {
         status: 'Audiência marcada',
         titulo: 'Reclamação trabalhista — horas extras e verbas rescisórias',
         descricao:
-          'Reclamação trabalhista de Camila Rodrigues Nunes contra a Padaria Estrela do Bairro Ltda. A cliente foi admitida em 03/03/2021 como atendente e dispensada sem justa causa em 17/01/2026. Relata jornada habitual das 7h às 19h, com uma folga semanal irregular, sem pagamento de horas extras nem adicional noturno. Pedidos: reconhecimento da jornada, horas extras com reflexos, diferenças de FGTS, multa de 40%, aviso prévio e indenização por dano moral em razão de cobrança pública de metas. Audiência una designada para 25/08/2026, às 14h, na 42ª VT de São Paulo.',
+          'Reclamação trabalhista de Camila Rodrigues Nunes contra a Padaria Estrela do Bairro Ltda. A cliente foi admitida em 03/03/2021 como atendente e dispensada sem justa causa em 17/01/2026. Relata jornada habitual das 7h às 19h, com uma folga semanal irregular, sem pagamento de horas extras nem adicional noturno. Pedidos: reconhecimento da jornada, horas extras com reflexos, diferenças de FGTS, multa de 40%, aviso prévio e indenização por dano moral em razão de cobrança pública de metas. Audiência una designada (ver prazo/agenda) na 42ª VT de São Paulo.',
         prioridade: 'Alta',
-        prazo: dataHora('2026-08-25T14:00:00-03:00'),
+        prazo: daquiA(5, 14, 0),
         tags: ['trabalhista', 'horas extras', 'audiência'],
         concluido: false,
         tribunalSigla: 'trt2',
@@ -297,9 +305,9 @@ async function main() {
         status: 'Em andamento',
         titulo: 'Cobrança de duplicatas — fornecimento de mercadorias',
         descricao:
-          'Ação de cobrança ajuizada pela Horizonte Alimentos Ltda contra o Atacado Boa Vista Comércio Ltda. Contrato de fornecimento de 12/02/2024; entregas de novembro e dezembro de 2025 (notas 4418, 4492 e 4501) no total de R$ 87.430,16, acrescidas de mora contratual de 1% a.m. e multa de 2%. Notificação extrajudicial em 18/03/2026 ficou sem resposta. Citação cumprida em 02/08/2026. Contestação protocolada em 12/08/2026 alegando mercadoria avariada — réplica até 22/08/2026. Há pedido subsidiário de desconsideração da personalidade se a execução restar frustrada.',
+          'Ação de cobrança ajuizada pela Horizonte Alimentos Ltda contra o Atacado Boa Vista Comércio Ltda. Contrato de fornecimento de 12/02/2024; entregas de novembro e dezembro de 2025 (notas 4418, 4492 e 4501) no total de R$ 87.430,16, acrescidas de mora contratual de 1% a.m. e multa de 2%. Notificação extrajudicial em 18/03/2026 ficou sem resposta. Citação cumprida; contestação protocolada alegando mercadoria avariada — réplica com prazo na agenda. Há pedido subsidiário de desconsideração da personalidade se a execução restar frustrada.',
         prioridade: 'Média',
-        prazo: dataHora('2026-08-22T18:00:00-03:00'),
+        prazo: daquiA(3, 18, 0),
         tags: ['cível', 'cobrança', 'PJ'],
         concluido: false,
         tribunalSigla: 'tjsp',
@@ -402,7 +410,7 @@ async function main() {
           titulo: 'Atualizar planilha de horas extras até a audiência',
           concluida: false,
           ordem: 1,
-          prazo: dataIso('2026-08-22'),
+          prazo: daquiA(2, 12, 0),
           criadoPorId: advogada.id,
         },
         {
@@ -410,7 +418,7 @@ async function main() {
           titulo: 'Confirmar comparecimento da cliente na 42ª VT',
           concluida: false,
           ordem: 2,
-          prazo: dataIso('2026-08-24'),
+          prazo: daquiA(4, 12, 0),
           criadoPorId: assistente.id,
         },
         {
@@ -426,7 +434,7 @@ async function main() {
           titulo: 'Redigir réplica à contestação (avaria)',
           concluida: false,
           ordem: 1,
-          prazo: dataIso('2026-08-21'),
+          prazo: daquiA(2, 12, 0),
           criadoPorId: advogada.id,
         },
         {
@@ -434,7 +442,7 @@ async function main() {
           titulo: 'Pedir ao cliente fotos da descarga e e-mails de aceite',
           concluida: false,
           ordem: 2,
-          prazo: dataIso('2026-08-18'),
+          prazo: daquiA(1, 12, 0),
           criadoPorId: assistente.id,
         },
       ],
@@ -447,14 +455,14 @@ async function main() {
           titulo: 'Audiência una — 42ª VT de São Paulo',
           descricao:
             'Camila Rodrigues Nunes vs Padaria Estrela do Bairro Ltda. Levar documentos originais e planilha atualizada. Cliente deve chegar 30 min antes.',
-          dataHora: dataHora('2026-08-25T14:00:00-03:00'),
+          dataHora: daquiA(5, 14, 0),
         },
         {
           processoId: casoCivel.id,
           titulo: 'Prazo de réplica — cobrança Horizonte',
           descricao:
             'Protocolar réplica à contestação do Atacado Boa Vista. Enfatizar canhotos assinados e ausência de reclamação contemporânea.',
-          dataHora: dataHora('2026-08-22T18:00:00-03:00'),
+          dataHora: daquiA(3, 18, 0),
         },
       ],
     });
