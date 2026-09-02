@@ -9,7 +9,14 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('dotenv').config({
+  path: path.join(
+    __dirname,
+    '..',
+    process.env.ENV_FILE || '.env',
+  ),
+  override: !process.env.DIRECT_URL && !process.env.DATABASE_URL,
+});
 
 function which(cmd) {
   const probe = process.platform === 'win32' ? 'where' : 'which';

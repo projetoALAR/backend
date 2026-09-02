@@ -5,6 +5,9 @@
  * Uso: npm run seed:demo
  *
  * Mantém o admin existente. Cria/atualiza advogada e assistente de demo.
+ *
+ * Segurança: aborta se o banco não é local (localhost/127.0.0.1) sem
+ * SEED_DEMO_CONFIRM=yes — evita apagar dados de produção por engano.
  */
 import 'dotenv/config';
 import { PrismaClient, Role } from '@prisma/client';
@@ -170,7 +173,39 @@ async function enviarPdf(
   console.log(`[demo]   PDF ${nome} (${pdf.length} bytes)`);
 }
 
+function assertSeedSafe() {
+  const url = (
+    process.env.DIRECT_URL ||
+    process.env.DATABASE_URL ||
+    ''
+  ).toLowerCase();
+  const force = process.env.SEED_DEMO_CONFIRM === 'yes';
+  const isLocal =
+    url.includes('localhost') ||
+    url.includes('127.0.0.1') ||
+    url.includes('alar_ci');
+  if (!isLocal && !force) {
+    console.error(
+      '\n[seed:demo] ABORTADO: DATABASE_URL/DIRECT_URL não aponta para banco local.',
+    );
+    console.error(
+      '  O seed apaga e recria processos/clientes de demo — não rode contra produção.',
+    );
+    console.error(
+      '  Use um projeto Supabase de dev/staging ou, se tiver certeza absoluta:',
+    );
+    console.error('  SEED_DEMO_CONFIRM=yes npm run seed:demo\n');
+    process.exit(1);
+  }
+  if (!isLocal && force) {
+    console.warn(
+      '[seed:demo] AVISO: SEED_DEMO_CONFIRM=yes — rodando contra banco remoto.',
+    );
+  }
+}
+
 async function main() {
+  assertSeedSafe();
   const pool = new Pool({
     connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL,
   });
